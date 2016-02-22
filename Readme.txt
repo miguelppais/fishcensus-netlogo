@@ -48,3 +48,21 @@ Divers are now a single breed
 max.velocity changed to max.sustained.speed
 burst.speed added
 behavior.time.step renamed movement.time.step and can be set to 10ths or 5ths of a second
+
+1.1
+Fixed some fish not choosing a patch when patch.gathering.w > 0
+Added cruise-urge: urge to maintain a constant speed and heading
+New weight: cruise.w
+Example files updated with new urge weights
+Annoying csv import file delimiter user prompt replaced with a chooser next to the "load data" button
+Fixed drag vector with wrong direction (duh!)
+Species creator: Parameters for drag calculation can now be edited individually on the interface
+Species creator: Added button to display the color of fishes after choosing
+Burst speed is no longer activated when diver.avoidance.w and predator.avoidance.w are 0 or negative
+Import data procedure changed from user input popup to a simple input interface
+Import data procedure merged with setup procedure
+BehaviorSpace multi-core errors should now be fixed
+Species creator: all drag.formula parameters saved on output csv file. All files from previous versions don't work with this version and must be updated
+Error messages and import data procedure updated on the main model to account for new csv structure
+avoid.obstacle removed from movement model, since it was slowing down the model and was not being used
+Output values are now stored as global variables instead of reporters

@@ -1,5 +1,5 @@
 extensions [
- csv 
+ csv
 ]
 
 breed [ fishes fish ]
@@ -13,18 +13,20 @@ b2.sp.param
 b3.sp.param
 b4.sp.param
 loaded.behavior
+wat.dens.value
 ]
 
 predators-own [
- satiety             ; when =100, the predator is full and does not seek prey. Decreases with time.
+ satiety             ; when >0, the predator does not seek prey. Decreases from 100 with time.
 ]
-  
+
 fishes-own [
   schoolmates        ; agentset of nearby fishes
   velocity           ; vector with x and y components determined by the previous velocity and the current acceleration at each step
   acceleration       ; vector with x and y components, determined by the sum of all urges
   picked.patch
   drag.formula
+  visible?
 ]
 
 patches-own [
@@ -50,11 +52,12 @@ to setup
   clear-drawing
   clear-all-plots
   stop-inspecting-dead-agents                         ; close diver detail windows
-  output-print "Drawing display grid..."
+  output-print "Painting floor tiles"
   ask patches with [pycor mod 2 = 0 and pxcor mod 2 = 0] [set pcolor 103]
   ask patches with [pycor mod 2 = 1 and pxcor mod 2 = 1] [set pcolor 103]
   ask patches with [pcolor = black] [set pcolor 105]
-  output-print "Placing fishes..." 
+  ifelse water-density = "Seawater - 1027 Kg/m3" [set wat.dens.value 1027] [set wat.dens.value 1000]
+  output-print "Placing fishes..."
   create-fishes (fish.density * (world-width * world-height))
     [
       setxy random-xcor random-ycor
@@ -63,10 +66,13 @@ to setup
       set velocity [ 0 0 ]
       set acceleration [ 0 0 ]
       set color fish.color
-      set drag.formula (-11297 / (20600 * (size ^ 0.8571)))
+      set drag.formula ((0.5 * drag-coefficient * wat.dens.value * ((length-surface * ((size * 100) ^ 2)) * 0.0001))/((lw-a * ((size * 100) ^ lw-b)) * 0.001))   ; formula to calculate k in order to calculate the deceleration due to drag in the form of a = kv^2 (v for velocity). length-surface area and length-weigth relationships are converted here from g and cm to Kg and m.
       set schoolmates no-turtles                                  ;sets schoolmates as an empty agentset (otherwise it would be set to 0)
       set picked.patch false
-    ]
+      if detectability < 1 [
+       set visible? random-bernoulli detectability                                 ; determine the visibility of fishes if detectability < 1
+       ifelse visible? [set color fish.color] [set color fish.color - 3]           ; make fishes appear darker when hidden
+    ]]
   reset-ticks
 end
 
@@ -75,7 +81,7 @@ end
 ;;
 to go
   repeat movement.time.step [                             ; variable movement.time.step in the interface should match the frame rate in settings
-    
+
     ask fishes [
       do.fish.movement
     ]
@@ -97,6 +103,10 @@ to go
   if smooth.animation?  [display]
   ]
   ask predators [if satiety > 0 [set satiety satiety - 5]]
+  ask fishes [if detectability < 1 [
+       set visible? random-bernoulli detectability                                 ; determine the visibility of fishes if detectability < 1
+       ifelse visible? [set color fish.color] [set color fish.color - 3]           ; make fishes appear darker when hidden
+    ]]
   tick
 end
 
@@ -108,31 +118,31 @@ to turn-at-most [turn max-turn]                      ; simple turning algorithm 
     [ rt turn ]
 end
 
-to pick.patch
+to pick.patch                                      ; observer procedure
   ask fishes with [picked.patch = false] [
    let chosen.patch patch-ahead 2 ; one-of patches in-cone 4 perception.angle
-   
+
    if [pxcor] of chosen.patch > (world-width - (picked.patch.dist + 1)) [                                              ; create a (picked.patch.dist + 1) -wide buffer so that picked patches are not too close to the edges
     let new.chosen.patch patch ([pxcor] of chosen.patch - (picked.patch.dist + 1)) ([pycor] of chosen.patch)
-    set chosen.patch new.chosen.patch 
+    set chosen.patch new.chosen.patch
    ]
    if [pxcor] of chosen.patch < (picked.patch.dist + 1) [
     let new.chosen.patch patch ([pxcor] of chosen.patch + (picked.patch.dist + 1)) ([pycor] of chosen.patch)
-    set chosen.patch new.chosen.patch 
+    set chosen.patch new.chosen.patch
    ]
    if [pycor] of chosen.patch > (world-height - (picked.patch.dist + 1)) [
     let new.chosen.patch patch ([pxcor] of chosen.patch) ([pycor] of chosen.patch - (picked.patch.dist + 1))
-    set chosen.patch new.chosen.patch 
-   ]   
+    set chosen.patch new.chosen.patch
+   ]
    if [pycor] of chosen.patch < (picked.patch.dist + 1) [
     let new.chosen.patch patch ([pxcor] of chosen.patch) ([pycor] of chosen.patch + (picked.patch.dist + 1))
-    set chosen.patch new.chosen.patch 
-   ]    
-   
+    set chosen.patch new.chosen.patch
+   ]
+
    set picked.patch chosen.patch
    if any? schoolmates [
     ask schoolmates [
-     set picked.patch chosen.patch 
+     set picked.patch chosen.patch
     ]
    ]]
 end
@@ -145,7 +155,7 @@ to deploy-diver
    set size 1.7
    set color green
    set heading 0
-   setxy (world-width / 2) 0 
+   setxy (world-width / 2) 0
   ]
 end
 
@@ -162,55 +172,51 @@ end
 
 
 to do.fish.movement  ;; fish procedure
-  ;; look for fishes in my vicinity
-  set schoolmates other fishes in-cone perception.dist perception.angle
+  ;if schooling is enabled, look for fishes in my vicinity
+  if schooling? [set schoolmates other fishes in-cone perception.dist perception.angle]
 
-  ;; acceleration at each step is determined
-  ;; entirely by the urges
   set acceleration (list 0 0)
 
-    
-    add-urge patch-center-urge patch.gathering.w
-    add-urge wander-urge wander.w
-    add-urge avoid-obstacle-urge obstacle.avoidance.w
-    add-urge avoid-predator-urge predator.avoidance.w
-    add-urge avoid-diver-urge diver.avoidance.w
-    add-urge rest-urge rest.w
+
+  if patch.gathering.w != 0 [add-urge patch-center-urge patch.gathering.w]                    ; check if weights are not 0 (to prevent useless calculations) and calculate all urge vectors
+  if wander.w != 0 [add-urge wander-urge wander.w]
+  if predator.avoidance.w != 0 [add-urge avoid-predator-urge predator.avoidance.w]
+  if diver.avoidance.w != 0 [add-urge avoid-diver-urge diver.avoidance.w]
+  if rest.w != 0 [add-urge rest-urge rest.w]
+  if cruise.w != 0 [add-urge cruise-urge cruise.w]
 
 
-  ;; if I'm not in a school ignore the school related
-  ;; urges. If schooling is disabled, ignore them as well
+  ;if I'm not in a school ignore the school related urges. If schooling is disabled, ignore them as well
   if count schoolmates > 0 and schooling?
   [ add-urge spacing-urge spacing.w
     add-urge center-urge center.w
     add-urge align-urge align.w ]
-  
-  
-  ; subtract the deceleration due to drag from the acceleration vector
-  let deceleration (scale ((drag.formula * ((magnitude velocity) ^ 2))) (normalize velocity))
-  set acceleration (add acceleration deceleration)
-  
 
-  ;; keep the acceleration within the accepted range
+
+  ;acceleration due to drag is in the opposite direction of the velocity vector
+  let deceleration (scale ((drag.formula * ((magnitude velocity) ^ 2))) (subtract (list 0 0) (normalize velocity)))
+  set acceleration (add acceleration deceleration)
+
+
+  ;keep the acceleration within the accepted range
   if magnitude acceleration > max.acceleration
   [ set acceleration
     (scale
         max.acceleration
         normalize acceleration) ]
 
-  ;; the new velocity of the fish is sum of the acceleration
-  ;; and the old velocity.
+  ;the new velocity of the fish is sum of the acceleration and the old velocity.
   set velocity (add velocity acceleration)
 
 
-  ;; keep the velocity within the accepted range
-  
-  ifelse (any? predators in-cone approach.dist perception.angle) or (any? divers in-cone approach.dist perception.angle) [
+  ;keep velocity within accepted range. When near threats, use burst.speed as limit, but only if avoidance urge weight is greater than 0
+
+  ifelse ((any? predators in-cone approach.dist perception.angle) and (predator.avoidance.w > 0)) or ((any? divers in-cone approach.dist perception.angle) and (diver.avoidance.w > 0)) [
    if magnitude velocity > burst.speed [
      set velocity (scale burst.speed normalize velocity)
      ]
   ] [
-  
+
   if magnitude velocity > max.sustained.speed
   [ set velocity
     (scale
@@ -223,7 +229,7 @@ to do.fish.movement  ;; fish procedure
   if magnitude velocity > 0.2 [
     facexy nxcor nycor
     fd (magnitude velocity) / movement.time.step]
-  
+
 end ;of do.fish.movement
 
 to add-urge [urge factor] ;; fish procedure
@@ -256,7 +262,7 @@ to-report center-urge ;; fish reporter
         mean [ ycor ] of schoolmates ) )
 end
 
-to-report align-urge ;; fish reporter
+to-report align-urge ; fish reporter
   ;; report the average difference in velocity
   ;; from my school mates
   if count schoolmates = 0 or align.w = 0
@@ -270,10 +276,15 @@ to-report align-urge ;; fish reporter
       velocity ))
 end
 
-to-report rest-urge ;; fish reporter
+to-report rest-urge ; fish reporter
   ;; report the difference in velocity
   ;; from [0 0]
   report subtract [0 0] velocity
+end
+
+to-report cruise-urge ; fish reporter
+  ; normalize the current velocity vector
+  report normalize velocity
 end
 
 to-report wander-urge ; fish reporter
@@ -281,7 +292,7 @@ to-report wander-urge ; fish reporter
   report n-values 2 [ (random-float 2) - 1 ]
 end
 
-to-report spacing-urge ;; fish reporter
+to-report spacing-urge ; fish reporter
   let urge [ 0 0 ]
   ;; report the sum of the distances to fishes
   ;; in my school that are closer to me than
@@ -297,23 +308,6 @@ to-report spacing-urge ;; fish reporter
   report urge
 end
 
-to-report avoid-obstacle-urge ;; fish reporter
- let urge (list 0 0)
-  if obstacle.avoidance.w = 0 [ report urge ]
-  ;; report the sum of the distances from
-  ;; any patches that are obstacles
-  ;; in each direction
-  ask patches in-cone perception.dist perception.angle with [ pcolor = brown ]   ; patches that are brown are obstacles
-  [ set urge
-      add
-        urge
-        subtract
-          (list [xcor] of myself [ycor] of myself)
-          (list pxcor pycor)
-  ]
-  report urge
-end
-
 to-report avoid-predator-urge ;; fish reporter
 ; a normalized vector that is opposite to the position of the closest predator
  let urge (list 0 0)
@@ -325,7 +319,7 @@ to-report avoid-predator-urge ;; fish reporter
   report urge
 end
 
-to-report avoid-diver-urge ;; fish reporter
+to-report avoid-diver-urge ; fish reporter
 ; a normalized vector that is opposite to the position of the closest diver
  let urge (list 0 0)
   if diver.avoidance.w = 0 [ report urge ]
@@ -336,12 +330,13 @@ to-report avoid-diver-urge ;; fish reporter
   report urge
 end
 
-to create-obstacles      ; observer procedure
-  ask n-of 10 patches [
-   set pcolor brown 
-  ]
-end
 
+; useful reporters
+
+to-report random-bernoulli [probability-true]
+  if probability-true < 0.0 or probability-true > 1.0 [user-message "WARNING: probability outside 0-1 range in random-bernoulli."]
+  report random-float 1.0 < probability-true
+end
 
 to-report random-float-between [a b]
   report random-float (b - a + 1) + a
@@ -377,42 +372,38 @@ end
 
 to save.species.data
   if (b1.freq + b2.freq + b3.freq + b4.freq) != 1 [user-message "ERROR: Sum of behavior frequencies must be 1." stop] ;check if behavior frequencies add up to 1
-  set sp.param (list species.name "fish top" fish.size fish.color fish.density visible.dist approach.dist perception.dist perception.angle prey.type max.acceleration max.sustained.speed burst.speed)
+  set sp.param (list species.name "fish top" fish.size fish.color fish.density visible.dist approach.dist perception.dist perception.angle prey.type max.acceleration max.sustained.speed burst.speed length-surface drag-coefficient lw-a lw-b water-density)
   if b1.freq = 0 [set b1.name "n/a" set b1.sp.param ["n/a" 0 0 false 0 0 0 0 0 0 0 0 0 0 0 0] ; check behaviors to see if any of them have freq 0 and fill them with zeros
     output-print "Behavior 1 saved as an empty slot."]
-  if b2.freq = 0 [set b2.name "n/a" set b2.sp.param ["n/a" 0 0 false 0 0 0 0 0 0 0 0 0 0 0 0] 
+  if b2.freq = 0 [set b2.name "n/a" set b2.sp.param ["n/a" 0 0 false 0 0 0 0 0 0 0 0 0 0 0 0]
     output-print "Behavior 2 saved as an empty slot."]
-  if b3.freq = 0 [set b3.name "n/a" set b3.sp.param ["n/a" 0 0 false 0 0 0 0 0 0 0 0 0 0 0 0] 
+  if b3.freq = 0 [set b3.name "n/a" set b3.sp.param ["n/a" 0 0 false 0 0 0 0 0 0 0 0 0 0 0 0]
     output-print "Behavior 3 saved as an empty slot."]
-  if b4.freq = 0 [set b4.name "n/a" set b4.sp.param ["n/a" 0 0 false 0 0 0 0 0 0 0 0 0 0 0 0] 
+  if b4.freq = 0 [set b4.name "n/a" set b4.sp.param ["n/a" 0 0 false 0 0 0 0 0 0 0 0 0 0 0 0]
     output-print "Behavior 4 saved as an empty slot."]
   let behavior.param (sentence b1.sp.param b2.sp.param b3.sp.param b4.sp.param)
   let file.name word user-input "Choose name for the csv file. Any file with the same name will be overwritten." ".csv"
   (csv:to-file file.name (list (list
       "Species" "shape" "size" "color" "density" "visible.dist" "approach.dist" "perception.dist" "perception.angle" "prey.type"
-      "max.acceleration" "max.sustained.speed" "burst.speed" "B1.name" "B1.frequency" "B1.detectability" "B1.schooling?" "B1.cruise.distance" "B1.align.w"
-      "B1.center.w" "B1.spacing.w" "B1.wander.w" "B1.rest.w" "B1.picked.patch.dist" "B1.patch.gathering.w" "B1.obstacle.avoidance.w"
-      "B1.predator.avoidance.w" "B1.prey.chasing.w" "B1.diver.avoidance.w" "B2.name" "B2.frequency" "B2.detectability" "B2.schooling?"
-      "B2.cruise.distance" "B2.align.w" "B2.center.w" "B2.spacing.w" "B2.wander.w" "B2.rest.w" "B2.picked.patch.dist" "B2.patch.gathering.w"
-      "B2.obstacle.avoidance.w" "B2.predator.avoidance.w" "B2.prey.chasing.w" "B2.diver.avoidance.w" "B3.name" "B3.frequency" "B3.detectability"
-      "B3.schooling?" "B3.cruise.distance" "B3.align.w" "B3.center.w" "B3.spacing.w" "B3.wander.w" "B3.rest.w" "B3.picked.patch.dist" "B3.patch.gathering.w"
-      "B3.obstacle.avoidance.w" "B3.predator.avoidance.w" "B3.prey.chasing.w" "B3.diver.avoidance.w" "B4.name" "B4.frequency" "B4.detectability" "B4.schooling?"
-      "B4.cruise.distance" "B4.align.w" "B4.center.w" "B4.spacing.w" "B4.wander.w" "B4.rest.w" "B4.picked.patch.dist" "B4.patch.gathering.w" "B4.obstacle.avoidance.w"
-      "B4.predator.avoidance.w" "B4.prey.chasing.w" "B4.diver.avoidance.w") sentence sp.param behavior.param) ",")
+      "max.acceleration" "max.sustained.speed" "burst.speed" "length-surface" "drag-coefficient" "lw-a" "lw-b" "water-density"
+      "B1.name" "B1.frequency" "B1.detectability" "B1.schooling?" "B1.cruise.distance" "B1.align.w" "B1.center.w" "B1.spacing.w" "B1.wander.w" "B1.rest.w" "B1.cruise.w" "B1.picked.patch.dist" "B1.patch.gathering.w" "B1.predator.avoidance.w" "B1.prey.chasing.w" "B1.diver.avoidance.w"
+      "B2.name" "B2.frequency" "B2.detectability" "B2.schooling?" "B2.cruise.distance" "B2.align.w" "B2.center.w" "B2.spacing.w" "B2.wander.w" "B2.rest.w" "B2.cruise.w" "B2.picked.patch.dist" "B2.patch.gathering.w" "B2.predator.avoidance.w" "B2.prey.chasing.w" "B2.diver.avoidance.w"
+      "B3.name" "B3.frequency" "B3.detectability" "B3.schooling?" "B3.cruise.distance" "B3.align.w" "B3.center.w" "B3.spacing.w" "B3.wander.w" "B3.rest.w" "B3.cruise.w" "B3.picked.patch.dist" "B3.patch.gathering.w" "B3.predator.avoidance.w" "B3.prey.chasing.w" "B3.diver.avoidance.w"
+      "B4.name" "B4.frequency" "B4.detectability" "B4.schooling?" "B4.cruise.distance" "B4.align.w" "B4.center.w" "B4.spacing.w" "B4.wander.w" "B4.rest.w" "B4.cruise.w" "B4.picked.patch.dist" "B4.patch.gathering.w" "B4.predator.avoidance.w" "B4.prey.chasing.w" "B4.diver.avoidance.w") sentence sp.param behavior.param) ",")
   output-print "Species data saved."
-  file-close-all                                                                 ; prevents csv file from being impossible to delete (DOES IT?)
+  file-close-all                                                                 ; prevents csv file from being impossible to delete after closing NetLogo (I think...)
   user-message (word "File " file.name " was created and can be found in the model folder.")
 end
 
 to load.species.data
   output-print "Importing species data..."
   let import.name (word user-input "Name of the .csv file with species parameters? (exclude extension)" ".csv")
-  let import.delimiter user-input "Delimiter symbol in the .csv file? (usually , or ;)"               ; a window prompts for the csv file delimiter
-  carefully [let species.data (csv:from-file import.name import.delimiter)                            ; import csv file into a list of lists
+  carefully [let species.data (csv:from-file import.name csv.delimiter)                            ; import csv file into a list of lists
   let nr.species length species.data - 1                                                            ; all filled lines minus the header
   user-message (word "Detected " nr.species " species in the file. If more than one, only the first will be imported.")
   output-print "Setting species parameter values..."
   let params item 1 species.data
+  if length params != 82 [user-message (word "ERROR: Species parameter list must have 82 values. Check number of columns in input file.") stop] ; ERROR MESSAGE
   set species.name item 0 params
   set fish.size item 2 params
   set fish.color item 3 params
@@ -425,11 +416,16 @@ to load.species.data
   set max.acceleration item 10 params
   set max.sustained.speed item 11 params
   set burst.speed item 12 params
-  set b1.sp.param sublist params 13 29
-  set b2.sp.param sublist params 29 45
-  set b3.sp.param sublist params 45 61
-  set b4.sp.param sublist params 61 77
-    ]                           
+  set length-surface item 13 params
+  set drag-coefficient item 14 params
+  set lw-a item 15 params
+  set lw-b item 16 params
+  set water-density item 17 params
+  set b1.sp.param sublist params 18 34
+  set b2.sp.param sublist params 34 50
+  set b3.sp.param sublist params 50 66
+  set b4.sp.param sublist params 66 82
+    ]
   [user-message (word "File " import.name " not found in model folder.") stop]
   output-print "Loading behavior parameters..."
   setup
@@ -443,10 +439,10 @@ end
 ; Saving behavior parameters
 
 to save.b1
-  if b1.freq = 0 [set b1.name "n/a" set b1.sp.param ["n/a" 0 0 false 0 0 0 0 0 0 0 0 0 0 0 0] 
+  if b1.freq = 0 [set b1.name "n/a" set b1.sp.param ["n/a" 0 0 false 0 0 0 0 0 0 0 0 0 0 0 0]
     output-print "Behavior 1 saved as an empty slot."
     stop]
-  set b1.sp.param (list b1.name b1.freq detectability schooling? cruise.distance align.w center.w spacing.w wander.w rest.w picked.patch.dist patch.gathering.w obstacle.avoidance.w predator.avoidance.w prey.chasing.w diver.avoidance.w)
+  set b1.sp.param (list b1.name b1.freq detectability schooling? cruise.distance align.w center.w spacing.w wander.w rest.w cruise.w picked.patch.dist patch.gathering.w predator.avoidance.w prey.chasing.w diver.avoidance.w)
   set loaded.behavior b1.name
   output-print "Behavior 1 saved."
 end
@@ -455,7 +451,7 @@ to save.b2
   if b2.freq = 0 [set b2.name "n/a" set b2.sp.param ["n/a" 0 0 false 0 0 0 0 0 0 0 0 0 0 0 0]
     output-print "Behavior 2 saved as an empty slot."
     stop]
-  set b2.sp.param (list b2.name b2.freq detectability schooling? cruise.distance align.w center.w spacing.w wander.w rest.w picked.patch.dist patch.gathering.w obstacle.avoidance.w predator.avoidance.w prey.chasing.w diver.avoidance.w)
+  set b2.sp.param (list b2.name b2.freq detectability schooling? cruise.distance align.w center.w spacing.w wander.w rest.w cruise.w picked.patch.dist patch.gathering.w predator.avoidance.w prey.chasing.w diver.avoidance.w)
   set loaded.behavior b2.name
   output-print "Behavior 2 saved."
 end
@@ -464,7 +460,7 @@ to save.b3
   if b3.freq = 0 [set b3.name "n/a" set b3.sp.param ["n/a" 0 0 false 0 0 0 0 0 0 0 0 0 0 0 0]
     output-print "Behavior 3 saved as an empty slot."
     stop]
-  set b3.sp.param (list b3.name b3.freq detectability schooling? cruise.distance align.w center.w spacing.w wander.w rest.w picked.patch.dist patch.gathering.w obstacle.avoidance.w predator.avoidance.w prey.chasing.w diver.avoidance.w)
+  set b3.sp.param (list b3.name b3.freq detectability schooling? cruise.distance align.w center.w spacing.w wander.w rest.w cruise.w picked.patch.dist patch.gathering.w predator.avoidance.w prey.chasing.w diver.avoidance.w)
   set loaded.behavior b3.name
   output-print "Behavior 3 saved."
 end
@@ -473,7 +469,7 @@ to save.b4
   if b4.freq = 0 [set b4.name "n/a" set b4.sp.param ["n/a" 0 0 false 0 0 0 0 0 0 0 0 0 0 0 0]
     output-print "Behavior 4 saved as an empty slot."
     stop]
-  set b4.sp.param (list b4.name b4.freq detectability schooling? cruise.distance align.w center.w spacing.w wander.w rest.w picked.patch.dist patch.gathering.w obstacle.avoidance.w predator.avoidance.w prey.chasing.w diver.avoidance.w)
+  set b4.sp.param (list b4.name b4.freq detectability schooling? cruise.distance align.w center.w spacing.w wander.w rest.w cruise.w picked.patch.dist patch.gathering.w predator.avoidance.w prey.chasing.w diver.avoidance.w)
   set loaded.behavior b4.name
   output-print "Behavior 4 saved."
 end
@@ -493,25 +489,26 @@ to load.b1
   set spacing.w item 7 b1.sp.param
   set wander.w item 8 b1.sp.param
   set rest.w item 9 b1.sp.param
-  set picked.patch.dist item 10 b1.sp.param
-  set patch.gathering.w item 11 b1.sp.param
-  set obstacle.avoidance.w item 12 b1.sp.param
+  set cruise.w item 10 b1.sp.param
+  set picked.patch.dist item 11 b1.sp.param
+  set patch.gathering.w item 12 b1.sp.param
   set predator.avoidance.w item 13 b1.sp.param
   set prey.chasing.w item 14 b1.sp.param
   set diver.avoidance.w item 15 b1.sp.param
   set loaded.behavior b1.name
   ifelse patch.gathering.w > 0 [
-  ask fishes with [picked.patch = false] [
-   let chosen.patch one-of patches in-cone picked.patch.dist perception.angle
-   set picked.patch chosen.patch
-   if any? schoolmates [
-    ask schoolmates [
-     set picked.patch chosen.patch 
-    ]
-   ]]] [
+   pick.patch
+   ] [
    ask fishes [
-    set picked.patch false 
-   ]]
+    set picked.patch false
+   ]
+   ]
+   if detectability = 1 [
+     ask fishes [
+       set visible? true
+       set color fish.color
+     ]
+     ]
 end
 
 to load.b2
@@ -526,25 +523,26 @@ to load.b2
   set spacing.w item 7 b2.sp.param
   set wander.w item 8 b2.sp.param
   set rest.w item 9 b2.sp.param
-  set picked.patch.dist item 10 b2.sp.param
-  set patch.gathering.w item 11 b2.sp.param
-  set obstacle.avoidance.w item 12 b2.sp.param
+  set cruise.w item 10 b2.sp.param
+  set picked.patch.dist item 11 b2.sp.param
+  set patch.gathering.w item 12 b2.sp.param
   set predator.avoidance.w item 13 b2.sp.param
   set prey.chasing.w item 14 b2.sp.param
   set diver.avoidance.w item 15 b2.sp.param
-  set loaded.behavior b2.name 
+  set loaded.behavior b2.name
   ifelse patch.gathering.w > 0 [
-  ask fishes with [picked.patch = false] [
-   let chosen.patch one-of patches in-cone picked.patch.dist perception.angle
-   set picked.patch chosen.patch
-   if any? schoolmates [
-    ask schoolmates [
-     set picked.patch chosen.patch 
-    ]
-   ]]] [
+   pick.patch
+   ] [
    ask fishes [
-    set picked.patch false 
-   ]]
+    set picked.patch false
+   ]
+   ]
+      if detectability = 1 [
+     ask fishes [
+       set visible? true
+       set color fish.color
+     ]
+     ]
 end
 
 to load.b3
@@ -559,25 +557,26 @@ to load.b3
   set spacing.w item 7 b3.sp.param
   set wander.w item 8 b3.sp.param
   set rest.w item 9 b3.sp.param
-  set picked.patch.dist item 10 b3.sp.param
-  set patch.gathering.w item 11 b3.sp.param
-  set obstacle.avoidance.w item 12 b3.sp.param
+  set cruise.w item 10 b3.sp.param
+  set picked.patch.dist item 11 b3.sp.param
+  set patch.gathering.w item 12 b3.sp.param
   set predator.avoidance.w item 13 b3.sp.param
   set prey.chasing.w item 14 b3.sp.param
   set diver.avoidance.w item 15 b3.sp.param
-  set loaded.behavior b3.name 
+  set loaded.behavior b3.name
   ifelse patch.gathering.w > 0 [
-  ask fishes with [picked.patch = false] [
-   let chosen.patch one-of patches in-cone picked.patch.dist perception.angle
-   set picked.patch chosen.patch
-   if any? schoolmates [
-    ask schoolmates [
-     set picked.patch chosen.patch 
-    ]
-   ]]] [
+   pick.patch
+   ] [
    ask fishes [
-    set picked.patch false 
-   ]]
+    set picked.patch false
+   ]
+   ]
+      if detectability = 1 [
+     ask fishes [
+       set visible? true
+       set color fish.color
+     ]
+     ]
 end
 
 to load.b4
@@ -592,25 +591,26 @@ to load.b4
   set spacing.w item 7 b4.sp.param
   set wander.w item 8 b4.sp.param
   set rest.w item 9 b4.sp.param
-  set picked.patch.dist item 10 b4.sp.param
-  set patch.gathering.w item 11 b4.sp.param
-  set obstacle.avoidance.w item 12 b4.sp.param
+  set cruise.w item 10 b4.sp.param
+  set picked.patch.dist item 11 b4.sp.param
+  set patch.gathering.w item 12 b4.sp.param
   set predator.avoidance.w item 13 b4.sp.param
   set prey.chasing.w item 14 b4.sp.param
   set diver.avoidance.w item 15 b4.sp.param
   set loaded.behavior b4.name
   ifelse patch.gathering.w > 0 [
-  ask fishes with [picked.patch = false] [
-   let chosen.patch one-of patches in-cone picked.patch.dist perception.angle
-   set picked.patch chosen.patch
-   if any? schoolmates [
-    ask schoolmates [
-     set picked.patch chosen.patch 
-    ]
-   ]]] [
+   pick.patch
+   ] [
    ask fishes [
-    set picked.patch false 
-   ]]
+    set picked.patch false
+   ]
+   ]
+      if detectability = 1 [
+     ask fishes [
+       set visible? true
+       set color fish.color
+     ]
+     ]
 end
 
 
@@ -644,13 +644,19 @@ to create-new-species
   set spacing.w 20
   set wander.w 8
   set rest.w 0
+  set cruise.w 0
   set picked.patch.dist 1
   set patch.gathering.w 0
-  set obstacle.avoidance.w 10
   set predator.avoidance.w 100
   set prey.chasing.w 0
   set diver.avoidance.w 10
   set loaded.behavior "new behavior"
+  set length-surface 0.4
+  set drag-coefficient 0.011
+  set lw-a 0.01989
+  set lw-b 2.8571
+  set water-density "Seawater - 1027 Kg/m3"
+  setup
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
@@ -689,7 +695,7 @@ fish.density
 fish.density
 0
 1
-0.66
+0.3
 0.01
 1
 fishes / m^2
@@ -704,7 +710,7 @@ perception.dist
 perception.dist
 0.05
 5
-0.35
+0.5
 0.05
 1
 meters
@@ -719,7 +725,7 @@ max.sustained.speed
 max.sustained.speed
 0
 10
-0.5
+0.3
 0.1
 1
 m/s
@@ -734,7 +740,7 @@ max.acceleration
 max.acceleration
 0
 2
-0.2
+0.1
 0.05
 1
 m/s^2
@@ -749,7 +755,7 @@ cruise.distance
 cruise.distance
 0.1
 10
-1
+3
 0.1
 1
 body lenghts
@@ -764,7 +770,7 @@ spacing.w
 spacing.w
 0
 50
-15
+0
 1
 1
 NIL
@@ -779,7 +785,7 @@ center.w
 center.w
 0
 20
-6
+0
 1
 1
 NIL
@@ -794,7 +800,7 @@ align.w
 align.w
 0
 20
-5
+0
 1
 1
 NIL
@@ -802,29 +808,14 @@ HORIZONTAL
 
 SLIDER
 265
-450
+445
 437
-483
+478
 wander.w
 wander.w
 0
 10
 3
-1
-1
-NIL
-HORIZONTAL
-
-SLIDER
-20
-615
-190
-648
-obstacle.avoidance.w
-obstacle.avoidance.w
-0
-100
-10
 1
 1
 NIL
@@ -864,33 +855,16 @@ NIL
 NIL
 1
 
-BUTTON
-260
-315
-390
-360
-Create obstacles
-create-obstacles
-NIL
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
-
 SLIDER
 265
-590
+610
 440
-623
+643
 picked.patch.dist
 picked.patch.dist
 0
 10
-1
+2
 0.5
 1
 meters
@@ -898,12 +872,12 @@ HORIZONTAL
 
 SLIDER
 20
-650
+615
 190
-683
+648
 predator.avoidance.w
 predator.avoidance.w
-0
+-5
 100
 10
 1
@@ -918,7 +892,7 @@ SWITCH
 448
 schooling?
 schooling?
-0
+1
 1
 -1000
 
@@ -931,7 +905,7 @@ perception.angle
 perception.angle
 45
 360
-320
+360
 5
 1
 degrees
@@ -939,12 +913,12 @@ HORIZONTAL
 
 SLIDER
 20
-685
+650
 190
-718
+683
 diver.avoidance.w
 diver.avoidance.w
--1
+-5
 100
 10
 1
@@ -954,14 +928,14 @@ HORIZONTAL
 
 SLIDER
 265
-630
+650
 440
-663
+683
 patch.gathering.w
 patch.gathering.w
 0
 20
-0
+6
 1
 1
 NIL
@@ -976,7 +950,7 @@ approach.dist
 approach.dist
 0.5
 10
-1
+0.7
 0.1
 1
 meters
@@ -988,7 +962,7 @@ INPUTBOX
 255
 70
 species.name
-Schooling
+Cryptic
 1
 0
 String
@@ -1046,9 +1020,9 @@ Individual movement
 
 TEXTBOX
 265
-570
+590
 415
-588
+608
 Gathering parameters
 11
 0.0
@@ -1060,7 +1034,7 @@ INPUTBOX
 165
 860
 B1.name
-wandering
+guarding
 1
 0
 String
@@ -1099,7 +1073,7 @@ INPUTBOX
 165
 980
 B3.name
-stationary
+nested
 1
 0
 String
@@ -1110,7 +1084,7 @@ INPUTBOX
 165
 1040
 B4.name
-n/a
+patrolling
 1
 0
 String
@@ -1243,7 +1217,7 @@ fish.size
 fish.size
 0.05
 1
-0.2
+0.1
 0.01
 1
 meters
@@ -1252,12 +1226,12 @@ HORIZONTAL
 CHOOSER
 260
 80
-525
+445
 125
 fish.color
 fish.color
-0 5 9.9 25 35 45 55 65 75 85 95 100 105 115 125 135
-2
+8 9.9 18 28 38 48 58 68 88 128 138
+1
 
 BUTTON
 20
@@ -1302,14 +1276,14 @@ visible.dist
 visible.dist
 0.5
 20
-4
+1
 0.5
 1
 meters
 HORIZONTAL
 
 MONITOR
-395
+260
 315
 525
 360
@@ -1328,7 +1302,7 @@ b1.freq
 b1.freq
 0
 1
-0.5
+0.25
 0.05
 1
 NIL
@@ -1358,7 +1332,7 @@ b3.freq
 b3.freq
 0
 1
-0.3
+0.1
 0.05
 1
 NIL
@@ -1373,7 +1347,7 @@ b4.freq
 b4.freq
 0
 1
-0
+0.45
 0.05
 1
 NIL
@@ -1402,14 +1376,14 @@ prey.type
 
 SLIDER
 265
-415
+410
 437
-448
+443
 detectability
 detectability
 0
 1
-1
+0.8
 0.1
 1
 NIL
@@ -1427,9 +1401,9 @@ BEHAVIOR PARAMETERS_____________________________________________________________
 
 MONITOR
 265
-670
+690
 440
-715
+735
 Current behavior
 loaded.behavior
 17
@@ -1438,9 +1412,9 @@ loaded.behavior
 
 SLIDER
 265
-520
+550
 437
-553
+583
 prey.chasing.w
 prey.chasing.w
 0
@@ -1462,10 +1436,10 @@ To save an empty behavior, simply set frequency to 0 and save.
 1
 
 BUTTON
-445
-590
+440
+650
 515
-623
+683
 Pick patch
 pick.patch
 NIL
@@ -1587,14 +1561,14 @@ HORIZONTAL
 
 SLIDER
 265
-485
+480
 437
-518
+513
 rest.w
 rest.w
 0
 20
-0
+2
 1
 1
 NIL
@@ -1722,7 +1696,7 @@ INPUTBOX
 335
 240
 aspect.ratio
-3
+1.61389
 1
 0
 Number
@@ -1827,7 +1801,7 @@ burst.speed
 burst.speed
 0
 10
-2.6
+1.1
 0.1
 1
 m/s
@@ -1878,6 +1852,223 @@ NIL
 NIL
 1
 
+SLIDER
+265
+515
+437
+548
+cruise.w
+cruise.w
+0
+10
+0
+1
+1
+NIL
+HORIZONTAL
+
+CHOOSER
+415
+1095
+507
+1140
+csv.delimiter
+csv.delimiter
+"," ";"
+0
+
+TEXTBOX
+1150
+870
+1390
+888
+DRAG FORCE PARAMETERS (change is optional)
+11
+0.0
+1
+
+INPUTBOX
+1190
+890
+1285
+950
+length-surface
+0.4
+1
+0
+Number
+
+TEXTBOX
+1290
+920
+1365
+938
+* length^2
+11
+0.0
+1
+
+TEXTBOX
+1150
+905
+1195
+935
+Surface area =
+11
+0.0
+1
+
+INPUTBOX
+1190
+950
+1285
+1010
+drag-coefficient
+0.011
+1
+0
+Number
+
+TEXTBOX
+1155
+1015
+1330
+1033
+length-weight (W = a * L^b)
+11
+0.0
+1
+
+INPUTBOX
+1155
+1035
+1235
+1095
+lw-a
+0.01989
+1
+0
+Number
+
+INPUTBOX
+1235
+1035
+1310
+1095
+lw-b
+2.8571
+1
+0
+Number
+
+TEXTBOX
+1315
+1065
+1465
+1083
+in g and cm
+11
+0.0
+1
+
+BUTTON
+1285
+950
+1390
+1010
+defaults
+set length-surface 0.4\nset drag-coefficient 0.011\nset lw-a 0.01989\nset lw-b 2.8571\nset water-density \"Seawater - 1027 Kg/m3\"
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+CHOOSER
+1155
+1100
+1395
+1145
+water-density
+water-density
+"Seawater - 1027 Kg/m3" "Freshwater - 1000 Kg/m3"
+0
+
+TEXTBOX
+1290
+895
+1400
+913
+in g and cm2\n
+11
+0.0
+1
+
+BUTTON
+445
+80
+525
+125
+paint fishes
+ask fishes [set color fish.color]
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+TEXTBOX
+195
+630
+250
+670
+set to negative if attracted
+11
+15.0
+1
+
+BUTTON
+20
+690
+132
+735
+Draw fish path
+ask fishes [pen-down]
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+BUTTON
+140
+690
+245
+735
+Stop drawing
+ask fishes [pen-up]\nclear-drawing
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
 @#$#@#$#@
 ## WHAT IS IT?
 
@@ -1897,11 +2088,11 @@ VISION is the distance that a bird can see around it. MAX-VELOCITY is the fastes
 
 A bird's movement is determined by the set of urges acting on that bird:
 
-CENTER-CONSTANT - urge to move towards the center of its flock  
-VELOCITY-CONSTANT - urge to align its velocity with the velocity of her flockmates  
-SPACING-CONSTANT - urge to be no closer than CRUISE-DISTANCE from other birds  
-AVOIDANCE-CONSTANT - urge to avoid colliding with obstacles  
-WORLD-CENTER-CONSTANT - urge to avoid the edges of the world  
+CENTER-CONSTANT - urge to move towards the center of its flock
+VELOCITY-CONSTANT - urge to align its velocity with the velocity of her flockmates
+SPACING-CONSTANT - urge to be no closer than CRUISE-DISTANCE from other birds
+AVOIDANCE-CONSTANT - urge to avoid colliding with obstacles
+WORLD-CENTER-CONSTANT - urge to avoid the edges of the world
 WANDER-CONSTANT - urge to move in a random way
 
 The urge-constant sliders control the weight of each urge in determining the birds' behavior.
@@ -1916,19 +2107,19 @@ This model is based on Jon Klein's "Swarm" demo for breve, (see http://www.spide
 
 ## HOW TO CITE
 
-If you mention this model in an academic publication, we ask that you include these citations for the model itself and for the NetLogo software:  
-- Wilensky, U. (2005).  NetLogo Flocking 3D Alternate model.  http://ccl.northwestern.edu/netlogo/models/Flocking3DAlternate.  Center for Connected Learning and Computer-Based Modeling, Northwestern University, Evanston, IL.  
+If you mention this model in an academic publication, we ask that you include these citations for the model itself and for the NetLogo software:
+- Wilensky, U. (2005).  NetLogo Flocking 3D Alternate model.  http://ccl.northwestern.edu/netlogo/models/Flocking3DAlternate.  Center for Connected Learning and Computer-Based Modeling, Northwestern University, Evanston, IL.
 - Wilensky, U. (1999). NetLogo. http://ccl.northwestern.edu/netlogo/. Center for Connected Learning and Computer-Based Modeling, Northwestern University, Evanston, IL.
 
-In other publications, please use:  
+In other publications, please use:
 - Copyright 2005 Uri Wilensky. All rights reserved. See http://ccl.northwestern.edu/netlogo/models/Flocking3DAlternate for terms of use.
 
 ## COPYRIGHT NOTICE
 
 Copyright 2005 Uri Wilensky. All rights reserved.
 
-Permission to use, modify or redistribute this model is hereby granted, provided that both of the following requirements are followed:  
-a) this copyright notice is included.  
+Permission to use, modify or redistribute this model is hereby granted, provided that both of the following requirements are followed:
+a) this copyright notice is included.
 b) this model will not be redistributed for profit without permission from Uri Wilensky. Contact Uri Wilensky for appropriate licenses for redistribution for profit.
 @#$#@#$#@
 default
@@ -2261,7 +2452,7 @@ Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 
 @#$#@#$#@
-NetLogo 5.2.0
+NetLogo 5.2.1
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@

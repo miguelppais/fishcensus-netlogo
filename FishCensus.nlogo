@@ -1,7 +1,8 @@
 extensions [
   csv              ; used to import species parameters through a csv file
   rnd              ; used by fishes to calculate next behavior with a weighted random pick
-  ]          
+  profiler
+  ]
 
 ;Global variables not represented on the interface tab
 
@@ -10,6 +11,7 @@ globals[
   species.data              ; imported input data from the csv file
   nr.species                ; number of species in the csv file. Variable updated by the go procedure
   total.density
+  wat.dens.value            ; just a step to calculate drag.formula for each species when fish are created
   numb.fishes
   timed.transect.diver.mean.speed
   distance.transect.diver.mean.speed
@@ -26,6 +28,11 @@ globals[
   snapshot.estimates
   density.estimates
   bias.estimates
+  output.real              ; outputs for behaviorspace experiments (only work with 1 species)
+  output.estimated
+  output.difference
+  output.bias
+  output.instantaneous
 ]
 
 ;Agent types
@@ -48,7 +55,7 @@ fishes-own [                     ; fish variables
   species                        ; this separates the different types within the fish breed. This is the variable recorded by divers while counting
   prey.type                      ; "benthic" or "fish". Defines the type of feeding behavior (gather around a patch or chase prey)
   detectability                  ; probability of being missed (if = 1 fish is always counted if within visible.dist)
-  visible?                       ; boolean variable that is set by detectability every second                  
+  visible?                       ; boolean variable that is set by detectability every second
   visible.dist                   ; maximum distance from diver required to correctly identify the species
   approach.dist                  ; minimum distance from diver that the fish tolerate
   behavior.list                  ; list of up to 4 distinct behaviors
@@ -64,7 +71,6 @@ fishes-own [                     ; fish variables
   max.acceleration               ; maximum attainable acceleration
   diver.avoidance.w              ; weighs the urge to avoid divers. If negative, fish are attracted to divers
   predator.avoidance.w           ; weighs the urge to avoid fish with prey.type = "fish"
-  obstacle.avoidance.w           ; weighs the urge to avoid obstacles (brown patches)
   prey.chasing.w                 ; weighs the urge to chase other fish
   cruise.distance                ; distance among schoolmates in a school (in body lengths)
   align.w                        ; weighs the urge to match school direction
@@ -72,6 +78,7 @@ fishes-own [                     ; fish variables
   spacing.w                      ; weighs the urge to maintain crusing.distance from schoolmates
   wander.w                       ; weighs the urge to wander around randomly
   rest.w                         ; weighs the urge to stop and rest
+  cruise.w                       ; wighs the urge to keep a constant speed and heading
   schooling?                     ; boolean variable that determines if fish exhibit schooling behavior
 ]
 
@@ -82,7 +89,7 @@ divers-own [             ; distance transect diver variables
   speed
   memory
   viewangle
-  initial.ycor                   ; for distance transects                 
+  initial.ycor                   ; for distance transects
   final.ycor                     ; for distance transects
   finished?
 ]
@@ -91,44 +98,25 @@ divers-own [             ; distance transect diver variables
 ;Interface procedures
 
 
-to import-dataset       ; imports species data from a .csv file to global variable species.data
-  output-print "Importing species data..."
-  let file.name (word user-input "Name of the .csv file with species parameters? (exclude extension)" ".csv")
-  let file.delimiter user-input "Delimiter symbol in the .csv file? (usually , or ;)"               ; a window prompts for the csv file delimiter
-  if file.delimiter = "" [user-message "ERROR: Delimiter not specified. Please write the csv column delimiter (usually , or ;) when prompted." stop]   ; ERROR MESSAGE
-  carefully [set species.data (csv:from-file file.name file.delimiter)]                             ; import csv file into a list of lists
-  [user-message (word "File " file.name " not found in model folder.") stop] ; ERROR MESSAGE
-  if length species.data < 2 [user-message "ERROR: input file has only 1 row or is empty. Check if input file has a header plus 1 line per species." stop] ; ERROR MESSAGE
-  if length item 0 species.data != 77 [user-message "ERROR: unable to separate parameters in the file. Ensure the correct delimiter was picked." stop] ; ERROR MESSAGE
-  set nr.species length species.data - 1                                                            ; all filled lines minus the header
-  set real.densities []                                                                             ; resets real.densities
-  ifelse user-yes-or-no? (word "Detected " nr.species " species. Is this correct?") [               ; confirm number of species in the file
-    user-message "Species data imported. Press setup."
-    output-print "Data successfully loaded."
-    foreach n-values nr.species [? + 1] [
-      let sp.param item ? species.data
-      let name item 0 sp.param
-      let real.dens.pair list name item 4 sp.param
-      set real.densities lput real.dens.pair real.densities
-    ]
-  ] [  ; middle of user-yes-or-no                                                 
-  user-message "Check if input file has a header plus 1 line per species."                          ; ERROR MESSAGE
-  output-print "Number of species incorrectly identified. Check file."
-  stop] ; end of user-yes-or-no
-end
-
 to setup
-  if species.data = 0 [user-message "You need to import a dataset first. Import the example.csv file or create one using the species creator." stop] ; ERROR MESSAGE
-  if fixed.seed? [random-seed seed]
-  clear-ticks                                          ; reset model clock and clear everything except global variables (or else it would erase species.data and nr.species)
-  set hours 0
-  set minutes 0
-  set seconds 0
-  clear-turtles
-  clear-patches
-  clear-drawing
-  clear-all-plots
+  ca
   stop-inspecting-dead-agents                           ; clears diver detail windows from previous simulation runs
+  output-print "Importing species data..."
+  let full.file.name word file.name ".csv"
+  carefully [set species.data (csv:from-file full.file.name file.delimiter)]                             ; import csv file into a list of lists
+  [user-message (word "File " file.name " not found in model folder. Import the example.csv file or create one using the FishCensus species creator.") stop] ; ERROR MESSAGE
+  if species.data = 0 [user-message "You need to import a dataset. Import the example.csv file or create one using the FishCensus species creator." stop] ; ERROR MESSAGE
+  if length species.data < 2 [user-message "ERROR: input file has only 1 row or is empty. Check if input file has a header plus 1 line per species." stop] ; ERROR MESSAGE
+  if length item 0 species.data != 82 [user-message "ERROR: unable to separate parameters in the file. Ensure the correct file delimiter was picked." stop] ; ERROR MESSAGE
+  set nr.species length species.data - 1                                                            ; all filled lines minus the header
+  set real.densities []                                                                             ; establishes real.densities as a list
+  foreach n-values nr.species [? + 1] [                                                             ; Fills real densities with data from file
+    let sp.param item ? species.data
+    let real.dens.pair list item 0 sp.param item 4 sp.param
+    set real.densities lput real.dens.pair real.densities
+    ]
+  if fixed.seed? [random-seed seed]
+  output-print "Painting floor tiles..."
   ask patches with [pycor mod 2 = 0 and pxcor mod 2 = 0] [set pcolor 103]
   ask patches with [pycor mod 2 = 1 and pxcor mod 2 = 1] [set pcolor 103]
   ask patches with [pcolor = black] [set pcolor 105]
@@ -139,37 +127,37 @@ to setup
   set timed.transect.diver.mean.speed (timed.transect.diver.speed / 60)  ; these lines just convert interface speeds (in m/min) to m/s
   set distance.transect.diver.mean.speed (distance.transect.diver.speed / 60)
   set roving.diver.mean.speed (roving.diver.speed / 60)
-  set density.estimates []
+  set density.estimates []                                               ; establish diver record lists
   set snapshot.estimates []
   set bias.estimates []
   set persons no-turtles                                                  ; resets the "persons" agentset (otherwise it would be set to 0 and generate errors during setup)
-  
+
 ; for the timed transect, the sampled area is distance * width plus max visibility * width at the end (an approximation that ignores the fact that visibility is the radius of a circle).
 
   if sampling.method = "Fixed time transect" [
     set sampling.area timed.transect.width * (timed.transect.diver.mean.speed * transect.time.secs) + (timed.transect.width * max.visibility)
   ]
-  
+
 ; for the distance transect, the sampled area is only distance * width
-  
+
   if sampling.method = "Fixed distance transect" [
     set sampling.area distance.transect.width * transect.distance
   ]
-  
+
 ; for the stationary diver, it is the area of the circle around the diver
-  
+
   if sampling.method = "Stationary point count" [
     set sampling.area pi * stationary.radius ^ 2
   ]
-  
+
 ; the roving diver only records counts, so sampling area can be set to 1
 
   if sampling.method = "Random path" [
     set sampling.area 1
   ]
- 
-; read the information stored in species.data to place fishes 
-  
+
+; read the information stored in species.data to place fishes
+
   output-print "Placing fishes..."
   foreach n-values nr.species [? + 1] [           ; loop that creates fish for each species and sets all fish variables
     let sp.param item ? species.data
@@ -182,10 +170,11 @@ to setup
       set picked.patch false
       set schoolmates no-turtles                  ; sets schoolmates as an empty agentset
       set species item 0 sp.param
-      if length sp.param != 77 [user-message (word "ERROR: species number " ? " '" species "' has a parameter list that is incomplete or too long. Check file.") stop] ; ERROR MESSAGE
+      if length sp.param != 82 [user-message (word "ERROR: species number " ? " '" species "' has a parameter list that is incomplete or too long. Check file.") stop] ; ERROR MESSAGE
       set shape item 1 sp.param
       set size item 2 sp.param
-      set drag.formula (-11297 / (20600 * (size ^ 0.8571))) ; if size is fixed, this can be fixed too.
+      ifelse item 17 sp.param = "Seawater - 1027 Kg/m3" [set wat.dens.value 1027] [set wat.dens.value 1000]
+      set drag.formula ((0.5 * (item 14 sp.param) * wat.dens.value * (((item 13 sp.param) * ((size * 100) ^ 2)) * 0.0001))/(((item 15 sp.param) * ((size * 100) ^ (item 16 sp.param))) * 0.001))   ; formula to calculate k in order to calculate the deceleration due to drag in the form of a = kv^2 (v for velocity).
       set color item 3 sp.param
       set visible.dist item 5 sp.param
       set approach.dist item 6 sp.param
@@ -195,15 +184,15 @@ to setup
       set max.acceleration item 10 sp.param
       set max.sustained.speed item 11 sp.param
       set burst.speed item 12 sp.param
-      set behavior.list (list item 13 sp.param item 29 sp.param item 45 sp.param item 61 sp.param)
-      set behavior.freqs (list item 14 sp.param item 30 sp.param item 46 sp.param item 62 sp.param)
+      set behavior.list (list item 18 sp.param item 34 sp.param item 50 sp.param item 66 sp.param)
+      set behavior.freqs (list item 19 sp.param item 35 sp.param item 51 sp.param item 67 sp.param)
       if reduce + behavior.freqs != 1 [
        user-message (word "ERROR! Behavior frequencies for " species " do not add up to 1.") stop]   ; ERROR MESSAGE
       set behavior.params (list                                ; lists parameter values for all 4 behaviors
-        sublist sp.param 13 29
-        sublist sp.param 29 45
-        sublist sp.param 45 61
-        sublist sp.param 61 77)
+        sublist sp.param 18 34
+        sublist sp.param 34 50
+        sublist sp.param 50 66
+        sublist sp.param 66 82)
       set visible? true
       set behavior.set? false
       set.behavior                          ; fish procedure that draws the starting behavior from the list and fills in parameters
@@ -213,12 +202,12 @@ to setup
   set numb.fishes count fishes
   output-print (word "Imported " count fishes " fishes belonging to " nr.species " species,")
   output-print (word "with a total density of " total.density " fish per square meter.")
-  output-print "Stabilizing fish movement model..."
+  output-print "Running movement model for 20 model seconds..."
   ask fishes [repeat movement.time.step * 20 [do.fish.movement]] ; lets the fish movement model stabilize for 20 ticks
-  
-  
+
+
   output-print "Placing diver..."
-  
+
 if sampling.method = "Fixed time transect" [                                         ;timed transect diver setup
   create-divers 1 [
  set heading 0
@@ -230,7 +219,6 @@ if sampling.method = "Fixed time transect" [                                    
  set speed timed.transect.diver.mean.speed
  set viewangle 180
  set counted.fishes [] ; sets counted.fishes as an empty list
- ;set density.estimates [] ; sets density.estimates as an empty list
  set snapshot.fishes ([species] of (fishes with [(xcor >= (world-width / 2) - timed.transect.width) and (xcor <= (world-width / 2) + timed.transect.width) and (ycor >= (world-height / 4)) and (ycor <= ((world-height / 4) + (transect.time * timed.transect.diver.speed)))]))
   ]
   if buddy? [
@@ -239,8 +227,8 @@ if sampling.method = "Fixed time transect" [                                    
     set shape "diver"
     set color cyan
     set size 2
-    setxy ([xcor] of one-of divers + 1) ([ycor] of one-of divers - 1) 
-   ] 
+    setxy ([xcor] of one-of divers + 1) ([ycor] of one-of divers - 1)
+   ]
   ]
 ]
 
@@ -257,7 +245,6 @@ if sampling.method = "Fixed distance transect" [                                
  set initial.ycor ycor                                                              ; fixed distance transect divers record their start and end points as given by "transect.distance" initially
  set final.ycor ycor + transect.distance                                            ; because coordinates are in meters
  set counted.fishes [] ; sets counted.fishes as an empty list
- ;set density.estimates [] ; sets density.estimates as an empty list
  set snapshot.fishes ([species] of (fishes with [(xcor >= (world-width / 2) - distance.transect.width) and (xcor <= (world-width / 2) + distance.transect.width) and (ycor >= (world-height / 4)) and (ycor <= ((world-height / 4) + (transect.distance)))]))
   ]
   if buddy? [
@@ -266,8 +253,8 @@ if sampling.method = "Fixed distance transect" [                                
     set shape "diver"
     set color green
     set size 2
-    setxy ([xcor] of one-of divers + 1) ([ycor] of one-of divers - 1) 
-   ] 
+    setxy ([xcor] of one-of divers + 1) ([ycor] of one-of divers - 1)
+   ]
   ]
 ]
 
@@ -280,7 +267,6 @@ if sampling.method = "Stationary point count" [                                 
  setxy (world-width / 2) (world-height / 2)
  set viewangle 160
  set counted.fishes [] ; sets counted.fishes as an empty list
- ;set density.estimates [] ; sets density.estimates as an empty list
  set snapshot.fishes ([species] of (fishes in-radius stationary.radius))
 ]
   if buddy? [
@@ -289,8 +275,8 @@ if sampling.method = "Stationary point count" [                                 
     set shape "diver"
     set color red
     set size 2
-    setxy ([xcor] of one-of divers + 1) ([ycor] of one-of divers - 1) 
-   ] 
+    setxy ([xcor] of one-of divers + 1) ([ycor] of one-of divers - 1)
+   ]
   ]
 ]
 
@@ -313,14 +299,14 @@ if sampling.method = "Random path" [                                            
     set shape "diver"
     set color magenta
     set size 2
-    setxy ([xcor] of one-of divers + 1) ([ycor] of one-of divers - 1) 
-   ] 
+    setxy ([xcor] of one-of divers + 1) ([ycor] of one-of divers - 1)
+   ]
   ]
 ]
 
 set persons (turtle-set divers buddies) ; creates the agentset containing divers and buddies
 
-ask divers [                                                    
+ask divers [
  set finished? false                                            ; reset the "finished?" variable
  set memory []                                                  ; reset the memory list
 ]
@@ -337,20 +323,20 @@ end ;of setup procedure
 
 
 to go
-  if count divers = count divers with [finished?] [                                                               ; do.outputs and stop if diver is finished      
+  if count divers = count divers with [finished?] [                                                               ; do.outputs and stop if diver is finished
     do.outputs
-    stop]                                  
+    stop]
   if sampling.method = "Stationary point count" and stationary.radius > max.visibility [
    user-message "ERROR: stationary.radius is greater than max.visibility. Diver will not be able to see the sample area."              ; if the stationary radius is higher than visibility, stop and output an error description«
-   stop 
+   stop
   ]
-  
-  
+
+
   if sampling.method = "Fixed distance transect" [ask divers [                              ; divers count the fishes and then check if finishing conditions are met
       d.count.fishes
       set finished? ycor > final.ycor
       ]
-  ]          
+  ]
   if sampling.method = "Fixed time transect" [ask divers [
       t.count.fishes
       set finished? ticks > transect.time.secs
@@ -366,39 +352,39 @@ to go
       set finished? ticks > roving.time.secs
       ]
   ]
- 
-    
-  
+
+
+
   repeat movement.time.step [
-  
+
   if sampling.method = "Fixed distance transect" [ask divers [do.ddiver.movement]]         ; move the diver
   if sampling.method = "Fixed time transect" [ask divers [do.tdiver.movement]]
   if sampling.method = "Stationary point count" [ask divers [do.stdiver.movement]]
   if sampling.method = "Random path" [ask divers [do.rdiver.movement]]
 
-  
+
   ask buddies [                                                                           ; move the buddy
    move-to one-of divers
    set heading [heading] of one-of divers
    rt 135 fd sqrt 2                           ; keep 1m behind and 1m to the right of the diver
    set heading [heading] of one-of divers
-   
+
   ]
 
-  ask fishes [                                                                            ; move the fishes                                                     
+  ask fishes [                                                                            ; move the fishes
     do.fish.movement
     ]
   if smooth.animation? [display]
-  ] ; closes repeat movement.time.step  
-  
+  ] ; closes repeat movement.time.step
+
   if sampling.method = "Random path" and ticks mod 2 = 0 [
-    ask divers[set heading heading + random-float-between (- roving.diver.turning.angle) roving.diver.turning.angle]]         ;random path turning happens every 2 seconds (must be out of the "repeat" cycle)           
+    ask divers[set heading heading + random-float-between (- roving.diver.turning.angle) roving.diver.turning.angle]]         ;random path turning happens every 2 seconds (must be out of the "repeat" cycle)
 
 
   if not super.memory? [ask divers [forget.fishes]]       ; if super memory is disabled, divers forget fishes they no longer see
-  
-  
-  ifelse ticks mod behavior.change.interval = 0 [ 
+
+
+  ifelse ticks mod behavior.change.interval = 0 [
     ask fishes [set behavior.set? false
       set.behavior]                                      ; fishes set a new behavior in the end of the go procedure, every x seconds (determined by behavior.change.interval)
   ] [ask fishes [
@@ -443,11 +429,16 @@ to do.outputs
       set bias.estimates lput bias.pair bias.estimates ; this just stores bias estimates in a variable
       output-print (word first bias.pair ": " last bias.pair)
       ] [
-      let bias.pair list name precision (((last snapshot.dens.pair) - (last item (? - 1) density.estimates)) / (last snapshot.dens.pair)) 3 ; bias is calculated as (counted density - snapshot density) / snapshot density
+      let bias.pair list name precision ((((last item (? - 1) density.estimates)) - (last snapshot.dens.pair)) / (last snapshot.dens.pair)) 3 ; bias is calculated as (counted density - snapshot density) / snapshot density
       set bias.estimates lput bias.pair bias.estimates ; this just stores bias estimates in a variable
       output-print (word first bias.pair ": " last bias.pair)
       ]
       ]
+   set output.real total.density                             ; fill output variables (only for 1st species)
+   set output.estimated last first density.estimates
+   set output.difference output.estimated - output.real
+   set output.instantaneous last first snapshot.estimates
+   set output.bias last first bias.estimates
   ]
 end ; of do.outputs
 
@@ -459,25 +450,26 @@ end ; of do.outputs
 
 to do.fish.movement
   if schooling? [set schoolmates other fishes in-cone perception.dist perception.angle with [species = [species] of myself]]    ; if schooling is true,look for conspecifics in my vicinity
- 
+
   set acceleration (list 0 0)                                                                                                   ; acceleration at each step is determined entirely by the urges
 
-    
-    add-urge patch-center-urge patch.gathering.w
-    add-urge wander-urge wander.w
-    add-urge avoid-obstacle-urge obstacle.avoidance.w
-    add-urge avoid-predator-urge predator.avoidance.w
-    add-urge avoid-diver-urge diver.avoidance.w
-    add-urge rest-urge rest.w
+;check if weights are not 0 (to prevent useless calculations) and calculate all urge vectors
+
+  if patch.gathering.w != 0 [add-urge patch-center-urge patch.gathering.w]                    ; check if weights are not 0 (to prevent useless calculations) and calculate all urge vectors
+  if wander.w != 0 [add-urge wander-urge wander.w]
+  if predator.avoidance.w != 0 [add-urge avoid-predator-urge predator.avoidance.w]
+  if diver.avoidance.w != 0 [add-urge avoid-diver-urge diver.avoidance.w]
+  if rest.w != 0 [add-urge rest-urge rest.w]
+  if cruise.w != 0 [add-urge cruise-urge cruise.w]
 
   if count schoolmates > 0 and schooling?                                                        ; if I'm not in a school ignore the school related urges. If schooling is disabled, ignore them as well
   [ add-urge spacing-urge spacing.w
     add-urge center-urge center.w
     add-urge align-urge align.w ]
-  
-  let deceleration (scale ((drag.formula * ((magnitude velocity) ^ 2))) (normalize velocity))    ; subtract the deceleration due to drag from the acceleration vector
+
+  let deceleration (scale ((drag.formula * ((magnitude velocity) ^ 2))) (subtract (list 0 0) (normalize velocity)))    ; subtract the deceleration due to drag from the acceleration vector
   set acceleration (add acceleration deceleration)
-  
+
   if magnitude acceleration > max.acceleration                                                   ; keep the acceleration within the accepted range. It is important that this is done after accounting for drag, so that max.acceleration can be reached.
   [ set acceleration
     (scale
@@ -486,13 +478,14 @@ to do.fish.movement
 
   set velocity (add velocity acceleration)                                                       ; the new velocity of the fish is sum of the acceleration and the old velocity.
 
-  ifelse (any? fishes in-cone approach.dist perception.angle with [species != [species] of myself and prey.type = "fish"]) or       ; keep velocity within accepted range. When near threats, use burst.speed as limit.
-  (any? persons in-cone approach.dist perception.angle) [
+ ;keep velocity within accepted range. When near threats, use burst.speed as limit, but only if avoidance urge weight is greater than 0
+
+  ifelse ((any? (fishes with [prey.type = "fish"]) in-cone approach.dist perception.angle) and (predator.avoidance.w > 0)) or ((any? divers in-cone approach.dist perception.angle) and (diver.avoidance.w > 0)) [
    if magnitude velocity > burst.speed [
      set velocity (scale burst.speed normalize velocity)
      ]
   ] [
-  
+
   if magnitude velocity > max.sustained.speed
   [ set velocity
     (scale
@@ -505,7 +498,7 @@ to do.fish.movement
   if magnitude velocity > 0.2 [
     facexy nxcor nycor
     fd (magnitude velocity) / movement.time.step]
-  
+
 end ;of do.fish.movement
 
 to add-urge [urge factor]                                              ;fish procedure
@@ -514,29 +507,29 @@ end
 
 to pick.patch                                                          ;fish procedure
   if picked.patch = false [
-   let chosen.patch patch-ahead 2 ; one-of patches in-cone 4 perception.angle
-   
+   let chosen.patch patch-ahead 2 ; second patch ahead of the fish
+
    if [pxcor] of chosen.patch > (world-width - (picked.patch.dist + 1)) [                                              ; create a (picked.patch.dist + 1) -wide buffer so that picked patches are not too close to the edges
     let new.chosen.patch patch ([pxcor] of chosen.patch - (picked.patch.dist + 1)) ([pycor] of chosen.patch)
-    set chosen.patch new.chosen.patch 
+    set chosen.patch new.chosen.patch
    ]
    if [pxcor] of chosen.patch < (picked.patch.dist + 1) [
     let new.chosen.patch patch ([pxcor] of chosen.patch + (picked.patch.dist + 1)) ([pycor] of chosen.patch)
-    set chosen.patch new.chosen.patch 
+    set chosen.patch new.chosen.patch
    ]
    if [pycor] of chosen.patch > (world-height - (picked.patch.dist + 1)) [
     let new.chosen.patch patch ([pxcor] of chosen.patch) ([pycor] of chosen.patch - (picked.patch.dist + 1))
-    set chosen.patch new.chosen.patch 
-   ]   
+    set chosen.patch new.chosen.patch
+   ]
    if [pycor] of chosen.patch < (picked.patch.dist + 1) [
     let new.chosen.patch patch ([pxcor] of chosen.patch) ([pycor] of chosen.patch + (picked.patch.dist + 1))
-    set chosen.patch new.chosen.patch 
-   ]    
-   
+    set chosen.patch new.chosen.patch
+   ]
+
    set picked.patch chosen.patch
    if any? schoolmates [
     ask schoolmates [
-     set picked.patch chosen.patch 
+     set picked.patch chosen.patch
     ]
    ]]
 end
@@ -557,9 +550,9 @@ to set.behavior                                                        ; fish pr
     set spacing.w item 7 params
     set wander.w item 8 params
     set rest.w item 9 params
-    set picked.patch.dist item 10 params
-    set patch.gathering.w item 11 params
-    set obstacle.avoidance.w item 12 params
+    set cruise.w item 10 params
+    set picked.patch.dist item 11 params
+    set patch.gathering.w item 12 params
     set predator.avoidance.w item 13 params
     set prey.chasing.w item 14 params
     set diver.avoidance.w item 15 params
@@ -567,7 +560,7 @@ to set.behavior                                                        ; fish pr
     set behavior.set? true
     if any? schoolmates [
       ask schoolmates [
-        set current.behavior [current.behavior] of myself                         
+        set current.behavior [current.behavior] of myself
         set detectability item 2 params
         set schooling? item 3 params
         set cruise.distance item 4 params
@@ -576,15 +569,15 @@ to set.behavior                                                        ; fish pr
         set spacing.w item 7 params
         set wander.w item 8 params
         set rest.w item 9 params
-        set picked.patch.dist item 10 params
-        set patch.gathering.w item 11 params
-        set obstacle.avoidance.w item 12 params
+        set cruise.w item 10 params
+        set picked.patch.dist item 11 params
+        set patch.gathering.w item 12 params
         set predator.avoidance.w item 13 params
         set prey.chasing.w item 14 params
         set diver.avoidance.w item 15 params
         if detectability < 1 [set visible? random-bernoulli detectability]
         set behavior.set? true
-      ]      
+      ]
     ]
     ifelse patch.gathering.w > 0 [                                       ; if selected behavior has patch gathering urge, pick a patch. If in a school, ask schoolmates to pick a patch collectively.
       pick.patch] [set picked.patch false]                               ; if patch gathering urge has zero weight, variable picked.patch is set to false (important for pick.patch procedure).
@@ -638,6 +631,11 @@ to-report rest-urge ;; fish reporter
   report subtract [0 0] velocity
 end
 
+to-report cruise-urge ; fish reporter
+  ; normalize the current velocity vector
+  report normalize velocity
+end
+
 to-report wander-urge ; fish reporter
   ;; report 2 random numbers between -1 and 1
   report n-values 2 [ (random-float 2) - 1 ]
@@ -655,23 +653,6 @@ to-report spacing-urge ;; fish reporter
         (subtract
           (list [xcor] of myself [ycor] of myself)
           (list xcor ycor))
-  ]
-  report urge
-end
-
-to-report avoid-obstacle-urge ;; fish reporter
- let urge (list 0 0)
-  if obstacle.avoidance.w = 0 [ report urge ]
-  ;; report the sum of the distances from
-  ;; any patches that are obstacles
-  ;; in each direction
-  ask patches in-cone perception.dist perception.angle with [ pcolor = brown ]   ; patches that are brown are obstacles
-  [ set urge
-      add
-        urge
-        subtract
-          (list [xcor] of myself [ycor] of myself)
-          (list pxcor pycor)
   ]
   report urge
 end
@@ -698,7 +679,7 @@ to-report avoid-diver-urge ;; fish reporter
   report urge
 end
 
-; vector operations
+;VECTOR OPERATIONS
 
 to-report add [ v1 v2 ]
   report (map [ ?1 + ?2 ] v1 v2)
@@ -758,7 +739,7 @@ to d.count.fishes                      ; for fixed distance transects, there is 
     set memory sentence memory [who] of new.fishes
   ] [
   if any? new.fishes [                                      ; if there are new fishes, but they do not exceed count.saturation, just count them
-    let new.records ([species] of new.fishes) 
+    let new.records ([species] of new.fishes)
     set counted.fishes sentence counted.fishes new.records
     set memory sentence memory [who] of new.fishes
   ]]
@@ -777,7 +758,7 @@ to t.count.fishes
     set memory sentence memory [who] of new.fishes
   ] [
   if any? new.fishes [                                      ; if there are new fishes, but they do not exceed count.saturation, just count them
-    let new.records ([species] of new.fishes) 
+    let new.records ([species] of new.fishes)
     set counted.fishes sentence counted.fishes new.records
     set memory sentence memory [who] of new.fishes
   ]]
@@ -794,7 +775,7 @@ to s.count.fishes
     set memory sentence memory [who] of new.fishes
   ] [
   if any? new.fishes [                                      ; if there are new fishes, but they do not exceed count.saturation, just count them
-    let new.records ([species] of new.fishes) 
+    let new.records ([species] of new.fishes)
     set counted.fishes sentence counted.fishes new.records
     set memory sentence memory [who] of new.fishes
   ]]
@@ -811,7 +792,7 @@ to r.count.fishes
     set memory sentence memory [who] of new.fishes
   ] [
   if any? new.fishes [                                      ; if there are new fishes, but they do not exceed count.saturation, just count them
-    let new.records ([species] of new.fishes) 
+    let new.records ([species] of new.fishes)
     set counted.fishes sentence counted.fishes new.records
     set memory sentence memory [who] of new.fishes
   ]]
@@ -843,28 +824,6 @@ to-report occurrences [x the-list]             ; count the number of occurrences
   report reduce
     [ifelse-value (?2 = x) [?1 + 1] [?1]] (fput 0 the-list)
 end
-
-; OUTPUT REPORTERS (ONLY WORK FOR SINGLE SPECIES RUNS!)
-
-to-report real
-report total.density
-end
-
-to-report estimated
-report last first density.estimates  
-end
-
-to-report difference
-report estimated - real  
-end
-
-to-report instantaneous
-report last first snapshot.estimates  
-end
-
-to-report bias
-report last first bias.estimates  
-end
 @#$#@#$#@
 GRAPHICS-WINDOW
 415
@@ -894,9 +853,9 @@ seconds
 10.0
 
 BUTTON
-120
+135
 160
-205
+220
 210
 Setup
 setup
@@ -911,7 +870,7 @@ NIL
 1
 
 BUTTON
-205
+220
 160
 325
 210
@@ -1029,7 +988,7 @@ stationary.radius
 stationary.radius
 1
 20
-5
+3
 0.5
 1
 m
@@ -1203,7 +1162,7 @@ transect.distance
 transect.distance
 5
 100
-40
+20
 5
 1
 meters
@@ -1218,7 +1177,7 @@ stationary.time
 stationary.time
 1
 90
-2
+5
 1
 1
 minutes
@@ -1379,26 +1338,9 @@ SWITCH
 383
 smooth.animation?
 smooth.animation?
-0
+1
 1
 -1000
-
-BUTTON
-15
-160
-120
-210
-Import dataset
-import-dataset
-NIL
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
 
 TEXTBOX
 170
@@ -1421,19 +1363,19 @@ Disable smooth animation for faster model runs.
 1
 
 TEXTBOX
-35
+20
+130
 135
-105
-153
-1. Start here
+171
+1. Insert csv file name (without extension)
 11
 15.0
 1
 
 TEXTBOX
-125
+135
 130
-210
+220
 160
 2. Establish initial conditions
 11
@@ -1441,9 +1383,9 @@ TEXTBOX
 1
 
 TEXTBOX
-225
+235
 135
-320
+330
 153
 3. Run the model
 11
@@ -1541,10 +1483,10 @@ Please test behaviors in the species creator with the same number of decisions p
 1
 
 SWITCH
-15
-235
-132
-268
+230
+225
+385
+258
 fixed.seed?
 fixed.seed?
 1
@@ -1552,10 +1494,10 @@ fixed.seed?
 -1000
 
 INPUTBOX
-135
-220
-215
-280
+150
+225
+230
+285
 seed
 123456
 1
@@ -1563,10 +1505,10 @@ seed
 Number
 
 TEXTBOX
-225
-245
-380
-275
+235
+260
+390
+290
 Select a fixed seed to generate similar consecutive model runs.
 11
 0.0
@@ -1580,7 +1522,7 @@ CHOOSER
 sampling.method
 sampling.method
 "Fixed time transect" "Fixed distance transect" "Stationary point count" "Random path"
-3
+2
 
 BUTTON
 15
@@ -1606,7 +1548,7 @@ SWITCH
 618
 buddy?
 buddy?
-0
+1
 1
 -1000
 
@@ -1636,7 +1578,7 @@ INPUTBOX
 310
 70
 override.density
-0
+0.2
 1
 0
 Number
@@ -1684,6 +1626,78 @@ TEXTBOX
 Scroll down to see the full map\n V
 15
 15.0
+1
+
+CHOOSER
+15
+220
+135
+265
+file.delimiter
+file.delimiter
+"," ";"
+0
+
+INPUTBOX
+15
+160
+135
+220
+file.name
+not cryptic
+1
+0
+String
+
+BUTTON
+1060
+635
+1162
+668
+NIL
+profiler:start
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+BUTTON
+1060
+670
+1267
+703
+NIL
+profiler:stop print profiler:report
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+BUTTON
+1060
+705
+1162
+738
+NIL
+profiler:reset
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
 1
 
 @#$#@#$#@
@@ -1789,7 +1803,7 @@ To make corrections to observed values (values observed in the field by non-inst
 5. After the survey time finishes the model stops and the conversion factor is calculated.
 6. On the calculator, go to the "observed.value" box and input the number of fish from that species you counted in the field
 7. Select the appropriate method on the calculator (transect or stationary)
-8. Press calculate. The result is the "real" count, corrected for bias. 
+8. Press calculate. The result is the "real" count, corrected for bias.
 5. Repeat for other species.
 
 ## NOTES ON THE ADAPTATION TO NETLOGO
@@ -2172,7 +2186,7 @@ Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 
 @#$#@#$#@
-NetLogo 5.2.0
+NetLogo 5.2.1
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
@@ -2654,6 +2668,914 @@ NetLogo 5.2.0
     </enumeratedValueSet>
     <enumeratedValueSet variable="max.visibility">
       <value value="7"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="behavior.change.interval">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="buddy?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="count.saturation">
+      <value value="3"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="Precision and accuracy experiment, transect 0.05" repetitions="30" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>real</metric>
+    <metric>estimated</metric>
+    <metric>difference</metric>
+    <metric>instantaneous</metric>
+    <metric>bias</metric>
+    <enumeratedValueSet variable="sampling.method">
+      <value value="&quot;Fixed distance transect&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="transect.distance">
+      <value value="10"/>
+      <value value="20"/>
+      <value value="40"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="distance.transect.width">
+      <value value="2"/>
+      <value value="4"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="distance.transect.diver.speed">
+      <value value="4"/>
+      <value value="8"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="max.visibility">
+      <value value="5"/>
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="override.density">
+      <value value="0.05"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="smooth.animation?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="super.memory?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="show.paths?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="movement.time.step">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="fixed.seed?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="behavior.change.interval">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="buddy?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="count.saturation">
+      <value value="3"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="Precision and accuracy experiment, transect 0.1" repetitions="30" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>real</metric>
+    <metric>estimated</metric>
+    <metric>difference</metric>
+    <metric>instantaneous</metric>
+    <metric>bias</metric>
+    <enumeratedValueSet variable="sampling.method">
+      <value value="&quot;Fixed distance transect&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="transect.distance">
+      <value value="10"/>
+      <value value="20"/>
+      <value value="40"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="distance.transect.width">
+      <value value="2"/>
+      <value value="4"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="distance.transect.diver.speed">
+      <value value="4"/>
+      <value value="8"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="max.visibility">
+      <value value="5"/>
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="override.density">
+      <value value="0.1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="smooth.animation?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="super.memory?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="show.paths?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="movement.time.step">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="fixed.seed?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="behavior.change.interval">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="buddy?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="count.saturation">
+      <value value="3"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="Precision and accuracy experiment, transect 0.2" repetitions="30" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>real</metric>
+    <metric>estimated</metric>
+    <metric>difference</metric>
+    <metric>instantaneous</metric>
+    <metric>bias</metric>
+    <enumeratedValueSet variable="sampling.method">
+      <value value="&quot;Fixed distance transect&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="transect.distance">
+      <value value="10"/>
+      <value value="20"/>
+      <value value="40"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="distance.transect.width">
+      <value value="2"/>
+      <value value="4"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="distance.transect.diver.speed">
+      <value value="4"/>
+      <value value="8"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="max.visibility">
+      <value value="5"/>
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="override.density">
+      <value value="0.2"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="smooth.animation?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="super.memory?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="show.paths?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="movement.time.step">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="fixed.seed?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="behavior.change.interval">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="buddy?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="count.saturation">
+      <value value="3"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="Precision and accuracy experiment, stationary 0.05" repetitions="30" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>real</metric>
+    <metric>estimated</metric>
+    <metric>difference</metric>
+    <metric>instantaneous</metric>
+    <metric>bias</metric>
+    <enumeratedValueSet variable="sampling.method">
+      <value value="&quot;Stationary point count&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="stationary.radius">
+      <value value="2.5"/>
+      <value value="3.6"/>
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="stationary.turning.angle">
+      <value value="4"/>
+      <value value="8"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="stationary.time">
+      <value value="3"/>
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="max.visibility">
+      <value value="5"/>
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="override.density">
+      <value value="0.05"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="smooth.animation?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="super.memory?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="show.paths?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="movement.time.step">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="fixed.seed?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="behavior.change.interval">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="buddy?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="count.saturation">
+      <value value="3"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="Precision and accuracy experiment, stationary 0.1" repetitions="30" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>real</metric>
+    <metric>estimated</metric>
+    <metric>difference</metric>
+    <metric>instantaneous</metric>
+    <metric>bias</metric>
+    <enumeratedValueSet variable="sampling.method">
+      <value value="&quot;Stationary point count&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="stationary.radius">
+      <value value="2.5"/>
+      <value value="3.6"/>
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="stationary.turning.angle">
+      <value value="4"/>
+      <value value="8"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="stationary.time">
+      <value value="3"/>
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="max.visibility">
+      <value value="5"/>
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="override.density">
+      <value value="0.1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="smooth.animation?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="super.memory?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="show.paths?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="movement.time.step">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="fixed.seed?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="behavior.change.interval">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="buddy?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="count.saturation">
+      <value value="3"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="effect of behavior, stationary 0.2" repetitions="30" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>output.real</metric>
+    <metric>output.estimated</metric>
+    <metric>output.difference</metric>
+    <metric>output.instantaneous</metric>
+    <metric>output.bias</metric>
+    <enumeratedValueSet variable="file.name">
+      <value value="&quot;schooling&quot;"/>
+      <value value="&quot;no schooling&quot;"/>
+      <value value="&quot;large shy&quot;"/>
+      <value value="&quot;large bold&quot;"/>
+      <value value="&quot;large indifferent&quot;"/>
+      <value value="&quot;cryptic&quot;"/>
+      <value value="&quot;not cryptic&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="sampling.method">
+      <value value="&quot;Stationary point count&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="stationary.radius">
+      <value value="3"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="stationary.turning.angle">
+      <value value="4"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="stationary.time">
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="max.visibility">
+      <value value="7"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="override.density">
+      <value value="0.2"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="smooth.animation?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="super.memory?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="show.paths?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="movement.time.step">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="fixed.seed?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="behavior.change.interval">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="buddy?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="count.saturation">
+      <value value="3"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="effect of behavior, stationary 0.1" repetitions="30" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>output.real</metric>
+    <metric>output.estimated</metric>
+    <metric>output.difference</metric>
+    <metric>output.instantaneous</metric>
+    <metric>output.bias</metric>
+    <enumeratedValueSet variable="file.name">
+      <value value="&quot;schooling&quot;"/>
+      <value value="&quot;no schooling&quot;"/>
+      <value value="&quot;large shy&quot;"/>
+      <value value="&quot;large bold&quot;"/>
+      <value value="&quot;large indifferent&quot;"/>
+      <value value="&quot;cryptic&quot;"/>
+      <value value="&quot;not cryptic&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="sampling.method">
+      <value value="&quot;Stationary point count&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="stationary.radius">
+      <value value="3"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="stationary.turning.angle">
+      <value value="4"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="stationary.time">
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="max.visibility">
+      <value value="7"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="override.density">
+      <value value="0.1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="smooth.animation?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="super.memory?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="show.paths?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="movement.time.step">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="fixed.seed?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="behavior.change.interval">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="buddy?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="count.saturation">
+      <value value="3"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="effect of behavior, stationary 0.05" repetitions="30" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>output.real</metric>
+    <metric>output.estimated</metric>
+    <metric>output.difference</metric>
+    <metric>output.instantaneous</metric>
+    <metric>output.bias</metric>
+    <enumeratedValueSet variable="file.name">
+      <value value="&quot;schooling&quot;"/>
+      <value value="&quot;no schooling&quot;"/>
+      <value value="&quot;large shy&quot;"/>
+      <value value="&quot;large bold&quot;"/>
+      <value value="&quot;large indifferent&quot;"/>
+      <value value="&quot;cryptic&quot;"/>
+      <value value="&quot;not cryptic&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="sampling.method">
+      <value value="&quot;Stationary point count&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="stationary.radius">
+      <value value="3"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="stationary.turning.angle">
+      <value value="4"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="stationary.time">
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="max.visibility">
+      <value value="7"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="override.density">
+      <value value="0.05"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="smooth.animation?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="super.memory?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="show.paths?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="movement.time.step">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="fixed.seed?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="behavior.change.interval">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="buddy?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="count.saturation">
+      <value value="3"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="effect of behavior, transect 0.2" repetitions="30" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>output.real</metric>
+    <metric>output.estimated</metric>
+    <metric>output.difference</metric>
+    <metric>output.instantaneous</metric>
+    <metric>output.bias</metric>
+    <enumeratedValueSet variable="file.name">
+      <value value="&quot;schooling&quot;"/>
+      <value value="&quot;no schooling&quot;"/>
+      <value value="&quot;large shy&quot;"/>
+      <value value="&quot;large bold&quot;"/>
+      <value value="&quot;large indifferent&quot;"/>
+      <value value="&quot;cryptic&quot;"/>
+      <value value="&quot;not cryptic&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="sampling.method">
+      <value value="&quot;Fixed distance transect&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="transect.distance">
+      <value value="40"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="distance.transect.diver.speed">
+      <value value="8"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="distance.transect.width">
+      <value value="2"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="max.visibility">
+      <value value="7"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="override.density">
+      <value value="0.2"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="smooth.animation?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="super.memory?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="show.paths?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="movement.time.step">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="fixed.seed?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="behavior.change.interval">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="buddy?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="count.saturation">
+      <value value="3"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="effect of behavior, transect 0.1" repetitions="30" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>output.real</metric>
+    <metric>output.estimated</metric>
+    <metric>output.difference</metric>
+    <metric>output.instantaneous</metric>
+    <metric>output.bias</metric>
+    <enumeratedValueSet variable="file.name">
+      <value value="&quot;schooling&quot;"/>
+      <value value="&quot;no schooling&quot;"/>
+      <value value="&quot;large shy&quot;"/>
+      <value value="&quot;large bold&quot;"/>
+      <value value="&quot;large indifferent&quot;"/>
+      <value value="&quot;cryptic&quot;"/>
+      <value value="&quot;not cryptic&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="sampling.method">
+      <value value="&quot;Fixed distance transect&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="transect.distance">
+      <value value="40"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="distance.transect.diver.speed">
+      <value value="8"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="distance.transect.width">
+      <value value="2"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="max.visibility">
+      <value value="7"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="override.density">
+      <value value="0.1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="smooth.animation?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="super.memory?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="show.paths?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="movement.time.step">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="fixed.seed?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="behavior.change.interval">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="buddy?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="count.saturation">
+      <value value="3"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="effect of behavior, transect 0.05" repetitions="30" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>output.real</metric>
+    <metric>output.estimated</metric>
+    <metric>output.difference</metric>
+    <metric>output.instantaneous</metric>
+    <metric>output.bias</metric>
+    <enumeratedValueSet variable="file.name">
+      <value value="&quot;schooling&quot;"/>
+      <value value="&quot;no schooling&quot;"/>
+      <value value="&quot;large shy&quot;"/>
+      <value value="&quot;large bold&quot;"/>
+      <value value="&quot;large indifferent&quot;"/>
+      <value value="&quot;cryptic&quot;"/>
+      <value value="&quot;not cryptic&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="sampling.method">
+      <value value="&quot;Fixed distance transect&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="transect.distance">
+      <value value="40"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="distance.transect.diver.speed">
+      <value value="8"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="distance.transect.width">
+      <value value="2"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="max.visibility">
+      <value value="7"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="override.density">
+      <value value="0.05"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="smooth.animation?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="super.memory?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="show.paths?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="movement.time.step">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="fixed.seed?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="behavior.change.interval">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="buddy?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="count.saturation">
+      <value value="3"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="everything transect" repetitions="10" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>output.real</metric>
+    <metric>output.estimated</metric>
+    <metric>output.difference</metric>
+    <metric>output.instantaneous</metric>
+    <metric>output.bias</metric>
+    <enumeratedValueSet variable="file.name">
+      <value value="&quot;schooling&quot;"/>
+      <value value="&quot;cryptic 2&quot;"/>
+      <value value="&quot;cryptic 3&quot;"/>
+      <value value="&quot;large bold&quot;"/>
+      <value value="&quot;large shy&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="sampling.method">
+      <value value="&quot;Fixed distance transect&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="transect.distance">
+      <value value="10"/>
+      <value value="20"/>
+      <value value="30"/>
+      <value value="40"/>
+      <value value="50"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="distance.transect.width">
+      <value value="1"/>
+      <value value="2"/>
+      <value value="3"/>
+      <value value="4"/>
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="distance.transect.diver.speed">
+      <value value="2"/>
+      <value value="4"/>
+      <value value="6"/>
+      <value value="8"/>
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="max.visibility">
+      <value value="6"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="override.density">
+      <value value="0.3"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="smooth.animation?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="super.memory?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="show.paths?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="movement.time.step">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="fixed.seed?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="behavior.change.interval">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="buddy?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="count.saturation">
+      <value value="3"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="everything stationary" repetitions="10" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>output.real</metric>
+    <metric>output.estimated</metric>
+    <metric>output.difference</metric>
+    <metric>output.instantaneous</metric>
+    <metric>output.bias</metric>
+    <enumeratedValueSet variable="file.name">
+      <value value="&quot;schooling&quot;"/>
+      <value value="&quot;cryptic 2&quot;"/>
+      <value value="&quot;cryptic 3&quot;"/>
+      <value value="&quot;large bold&quot;"/>
+      <value value="&quot;large shy&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="sampling.method">
+      <value value="&quot;Stationary point count&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="stationary.turning.angle">
+      <value value="2"/>
+      <value value="4"/>
+      <value value="6"/>
+      <value value="8"/>
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="stationary.radius">
+      <value value="1"/>
+      <value value="2"/>
+      <value value="3"/>
+      <value value="4"/>
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="stationary.time">
+      <value value="3"/>
+      <value value="5"/>
+      <value value="7"/>
+      <value value="9"/>
+      <value value="11"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="max.visibility">
+      <value value="6"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="override.density">
+      <value value="0.3"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="smooth.animation?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="super.memory?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="show.paths?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="movement.time.step">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="fixed.seed?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="behavior.change.interval">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="buddy?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="count.saturation">
+      <value value="3"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="effect of behavior transect" repetitions="100" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>output.real</metric>
+    <metric>output.estimated</metric>
+    <metric>output.difference</metric>
+    <metric>output.instantaneous</metric>
+    <metric>output.bias</metric>
+    <enumeratedValueSet variable="file.name">
+      <value value="&quot;schooling&quot;"/>
+      <value value="&quot;no schooling&quot;"/>
+      <value value="&quot;large shy&quot;"/>
+      <value value="&quot;large bold&quot;"/>
+      <value value="&quot;large indifferent&quot;"/>
+      <value value="&quot;cryptic 2&quot;"/>
+      <value value="&quot;not cryptic&quot;"/>
+      <value value="&quot;cryptic 3&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="sampling.method">
+      <value value="&quot;Fixed distance transect&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="transect.distance">
+      <value value="40"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="distance.transect.diver.speed">
+      <value value="8"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="distance.transect.width">
+      <value value="2"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="max.visibility">
+      <value value="6"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="override.density">
+      <value value="0.05"/>
+      <value value="0.1"/>
+      <value value="0.2"/>
+      <value value="0.3"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="smooth.animation?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="super.memory?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="show.paths?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="movement.time.step">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="fixed.seed?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="behavior.change.interval">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="buddy?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="count.saturation">
+      <value value="3"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="effect of behavior stationary" repetitions="100" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>output.real</metric>
+    <metric>output.estimated</metric>
+    <metric>output.difference</metric>
+    <metric>output.instantaneous</metric>
+    <metric>output.bias</metric>
+    <enumeratedValueSet variable="file.name">
+      <value value="&quot;schooling&quot;"/>
+      <value value="&quot;no schooling&quot;"/>
+      <value value="&quot;large shy&quot;"/>
+      <value value="&quot;large bold&quot;"/>
+      <value value="&quot;large indifferent&quot;"/>
+      <value value="&quot;cryptic 2&quot;"/>
+      <value value="&quot;cryptic 3&quot;"/>
+      <value value="&quot;not cryptic&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="sampling.method">
+      <value value="&quot;Stationary point count&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="stationary.radius">
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="stationary.turning.angle">
+      <value value="4"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="stationary.time">
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="max.visibility">
+      <value value="6"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="override.density">
+      <value value="0.05"/>
+      <value value="0.1"/>
+      <value value="0.2"/>
+      <value value="0.3"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="smooth.animation?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="super.memory?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="show.paths?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="movement.time.step">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="fixed.seed?">
+      <value value="false"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="behavior.change.interval">
       <value value="10"/>
