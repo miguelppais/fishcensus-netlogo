@@ -12,3 +12,12 @@ Survey time / distance is now specific to each method
 The run stops when all divers are finished
 Survey times are set in minutes on the interface
 Environment color changed to dark blue
+
+0.5
+Added new movement algorithm loosely based on Reefex model (behavior-driven movement)
+Fish change behavior every x seconds
+Number of species and variable values are imported from a csv file
+approach.dist is a new fish variable. Fish move away from the diver if this distance is reached
+visible.dist is now a property of fish species. Global variable changed to max.visibility
+New memory algorithm: super memory makes divers remember all fish, if turned off, divers forget fish that leave the FOV
+

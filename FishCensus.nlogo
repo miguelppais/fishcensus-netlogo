@@ -1,7 +1,18 @@
+extensions [
+  csv              ; used to import species parameters through a csv file
+  rnd              ; used by fishes to calculate next behavior with a weighted random pick
+  ]          
+
 ;Global variables not represented in the main screen
 
 globals[
   actual.area
+  file.name                 ; species parameters input csv file name
+  species.data              ; imported input data from the csv file
+  file.delimiter            ; delimiter for the csv file (user prompt)
+  nr.species                ; number of species in the csv file. Variable updated by the go procedure
+  total.density
+  numb.fishes
   timetransdiver.viewangle
   distransdiver.viewangle
   statdiver.viewangle
@@ -33,12 +44,16 @@ breed [rovdivers rovdiver] ;roving diver     ; roving divers can't calculate den
 ;Agent variables
 
 fishes-own [                     ; fish variables
+  current.behavior
   speed
+  turning.angle
   species
-  turning.angle                  ; in the future, this can be set by behavior
-  beahvior                       ; for future implementation
-  view.distance                  ; for future implementation
-  approach.dist                  ; for future implementation
+  detectability                  
+  visible.dist
+  approach.dist
+  behavior.list
+  behavior.freqs
+  behavior.params                ; a list of lists with speed and turning angle per behavior
 ]
 
 timetransdivers-own [            ; timed transect diver variables
@@ -76,11 +91,11 @@ rovdivers-own [                  ; roving diver variables
 
 ;Setup and go procedures
 
-
 to setup
   ca
   stop-inspecting-dead-agents                           ; clears diver detail windows from previous simulation runs
   ask patches [set pcolor 102]
+  output-print "Calculating global constants..."
   set actual.area world-height * world-width
   set timetransdiver.viewangle 180                      ; sets viewangles for all divers
   set distransdiver.viewangle 180
@@ -93,9 +108,9 @@ to setup
   set distance.transect.diver.mean.speed (distance.transect.diver.speed / 60)
   set roving.diver.mean.speed (roving.diver.speed / 60)
   
-; THIS SHOULD TAKE INTO ACCOUNT THE ARC IN THE END (replace "timed.transect.width * visibility.length")
+; THIS SHOULD TAKE INTO ACCOUNT THE ARC IN THE END (replace "timed.transect.width * max.visibility")
   
-  set timed.transect.area timed.transect.width * (timed.transect.diver.mean.speed * transect.time.secs) + (timed.transect.width * visibility.length)
+  set timed.transect.area timed.transect.width * (timed.transect.diver.mean.speed * transect.time.secs) + (timed.transect.width * max.visibility)
   
 ; for the distance transect, the sampled area is only distance * width
   
@@ -104,19 +119,47 @@ to setup
 ; for the stationary diver, it is the area of the circle around the diver
   
   set stationary.area pi * stationary.radius ^ 2
- 
-; if fish density is set to some number, then use that to calculate the number of fishes to deploy. Otherwise, just use the numb.fishes.
- 
-  ifelse fish.density != 0 [set numb.fishes ceiling actual.area * fish.density] [set fish.density numb.fishes / actual.area]
+
+; input species details from a csv file
   
-  create-fishes numb.fishes [
-   setxy random-xcor random-ycor
-   set color gray
-   set shape "fish rotate"
-   set size 0.3
-   set species item random 5 ["Sp1" "Sp2" "Sp3" "Sp4" "Sp5"]   ; allocates species randomly with equal probability
-   set speed fish.mean.speed
+  output-print "Importing species data..."
+  set file.name (word user-input "Name of the .csv file with species parameters? (exclude extension)" ".csv")
+  set file.delimiter user-input "Delimiter symbol in the .csv file? (usually , or ;)"               ; a window prompts for the csv file delimiter
+  set species.data (csv:from-file file.name file.delimiter)                                         ; import csv file into a list of lists
+  set nr.species length species.data - 1                                                            ; all filled lines minus the header
+  if not user-yes-or-no? (word "Detected " nr.species " species. Is this correct?") [               ; confirm number of species in the file
+  user-message "Check if input file has a header plus 1 line per species."                          ; error message if number is not correct
+  stop
   ]
+  output-print "Placing fishes..."
+  foreach n-values nr.species [? + 1] [                                                       ; loop that creates fish for each species and sets all fish variables
+    let sp.param item ? species.data
+    let sp.density item 4 sp.param
+    create-fishes (sp.density * actual.area) [
+      setxy random-xcor random-ycor
+      set species item 0 sp.param
+      set shape item 1 sp.param
+      set size item 2 sp.param
+      set color item 3 sp.param
+      set detectability item 5 sp.param
+      set visible.dist item 6 sp.param
+      set approach.dist item 7 sp.param
+      set behavior.list (list item 8 sp.param item 12 sp.param item 16 sp.param item 20 sp.param)
+      set behavior.freqs (list item 9 sp.param item 13 sp.param item 17 sp.param item 21 sp.param)
+      if reduce + behavior.freqs != 1 [
+       user-message (word "ERROR! Behavior frequencies for " species " do not add up to 1.")
+       stop
+      ]
+      set behavior.params (list list item 10 sp.param item 11 sp.param list item 14 sp.param item 15 sp.param list item 18 sp.param item 19 sp.param list item 22 sp.param item 23 sp.param)
+      
+      set.behavior                          ; fish procedure that draws the first behavior from the list and fills in speed and turning angle
+    ]
+  ]
+  set total.density (count fishes / actual.area)
+  set numb.fishes count fishes
+  output-print (word "Imported " count fishes " fishes belonging to " nr.species " species,")
+  output-print (word "with a total density of " total.density " fish per square meter.")
+  output-print "Placing divers..."
   
 if timed.transect.diver? = true [                                         ;timed transect diver setup
   create-timetransdivers 1 [
@@ -172,41 +215,15 @@ if roving.diver? = true [                                                      ;
 
 set divers (turtle-set timetransdivers distransdivers statdivers rovdivers) ; creates the agentset containing all divers (all methods)
 
-ask divers [                                                    ; reset the "finished?" variable
- set finished? false 
+ask divers [                                                    
+ set finished? false                                            ; reset the "finished?" variable
+ set memory []                                                  ; reset the memory list
 ]
 
-ifelse diver.memory? = true [                                   ; enable or disable diver memory (ability to remember counted fishes)
-    ask timetransdivers [
-      set memory []
-      ]
-    ask distransdivers [
-      set memory []
-      ] 
-    ask statdivers [
-      set memory []
-      ]
-    ask rovdivers [
-      set memory [] 
-    ]
-    ]
-   [
-    ask timetransdivers [
-      set memory false
-      ]
-    ask distransdivers [
-      set memory false
-      ]
-    ask statdivers [
-      set memory false
-      ]
-    ask rovdivers [
-      set memory false 
-    ]
-    ]
+output-print "Setup complete. Press GO to run the model"
 reset-ticks
 if show.diver.detail.windows? = true [
-  if any? timetransdivers [inspect one-of timetransdivers]         ;here I had to use "if any?" because inspect will return an error if it finds nobody
+  if any? timetransdivers [inspect one-of timetransdivers]         ; here I had to use "if any?" because inspect will return an error if it finds nobody
   if any? distransdivers [inspect one-of distransdivers]
   if any? statdivers [inspect one-of statdivers]
   if any? rovdivers [inspect one-of rovdivers]
@@ -219,8 +236,8 @@ to go
   if count divers = count divers with [finished?] [             
     do.outputs
     stop]                                   
-  if stationary.radius > visibility.length [
-   output-print "ERROR: stationary.radius is set to a value greater than visibility.length"              ; if the stationary radius is higher than visibility, stop and output an error description
+  if stationary.radius > max.visibility [
+   output-print "ERROR: stationary.radius is set to a value greater than max.visibility"              ; if the stationary radius is higher than visibility, stop and output an error description
    output-print "The diver will not commit to sampling an area that it will not be able to see"
    output-print "Stopping simulation"
    stop 
@@ -280,6 +297,17 @@ to go
   ask rovdivers [
     if not finished? [r.count.fishes]
   ]
+  
+  if not super.memory? [                                          ; if super memory is disabled, divers forget fishes they no longer see (a kind of "doorway effect")
+   ask timetransdivers [t.forget.fishes]
+   ask distransdivers [d.forget.fishes]
+   ask statdivers [s.forget.fishes]
+   ask rovdivers [r.forget.fishes] 
+  ]
+  
+  if ticks mod behavior.change.interval = 0 [ 
+    ask fishes [set.behavior]       ; fishes set a new behavior in the end of the go procedure, every x seconds (determined by behavior.change.interval)
+  ]
 end  ; of go procedure
 
 
@@ -289,21 +317,21 @@ end  ; of go procedure
 to do.outputs
   ask timetransdivers [
     let real.count length counted.fishes
-    let expected.count fish.density * timed.transect.area
+    let expected.count total.density * timed.transect.area
     set t.bias (real.count - expected.count) / expected.count
     output-type "Timed transect diver bias was " output-print precision t.bias 2            ; outputs bias with 2 decimal places
   ]
   
   ask distransdivers [
     let real.count length counted.fishes
-    let expected.count fish.density * distance.transect.area
+    let expected.count total.density * distance.transect.area
     set d.bias (real.count - expected.count) / expected.count
     output-type "Distance transect diver bias was " output-print precision d.bias 2         ; outputs bias with 2 decimal places
   ]
   
  ask statdivers [
     let real.count length counted.fishes
-    let expected.count fish.density * stationary.area
+    let expected.count total.density * stationary.area
     set s.bias (real.count - expected.count) / expected.count
     output-type "Stationary diver bias was " output-print precision s.bias 2                ; outputs bias with 2 decimal places
  ]
@@ -322,8 +350,19 @@ end
 ;fish movement
 
 to do.fish.movement
-  set heading heading + random-float-between (- fish.dir.angle) fish.dir.angle
+  set heading heading + random-float-between (- turning.angle) turning.angle
   fd speed ; each step is a second, so the speed is basically the distance
+end
+
+;behavior change
+
+to set.behavior
+  let pairs (map list behavior.list behavior.freqs)                    ; pairs behavior names with probabilities as lists within a list, to work better with the rnd extension: [[beh1 0.2] [beh2 0.3] [beh3 0.5]]
+  set current.behavior first rnd:weighted-one-of pairs [ last ? ]      ; pick a random behavior from behavior list, using a weighted random pick
+  let param.pos position current.behavior behavior.list                ; check which behavior was picked (1, 2, 3 or 4)
+  let params item param.pos behavior.params                            ; retreive speed and turning angle from the correct position in behavior.params
+  set speed first params                                               ; set the new values for the movement algorithm
+  set turning.angle last params
 end
 
 
@@ -340,26 +379,26 @@ end
 to d.count.fishes                      ; for fixed distance transects, there is a limit to the y coordinate (the diver doesn't count beyond the end mark of the transect)
   let myxcor xcor
   let my.final.ycor final.ycor
-  let seen.fishes fishes in-cone visibility.length distransdiver.viewangle
+  let seen.fishes fishes in-cone max.visibility distransdiver.viewangle
   let eligible.fishes seen.fishes with [(xcor > myxcor - (distance.transect.width / 2)) and (xcor < myxcor + (distance.transect.width / 2)) and (ycor < my.final.ycor)]  ; this only works for transects heading north.
                                                                                                                                                                       ; Also, this doesn't work if the diver gets near
                                                                                                                                                                       ; the top border. Divers and fish wrap to the bottom
                                                                                                                                                                       ; again, but the divers only start counting correctly
                                                                                                                                                                       ; again when they reach the other side.
-  ifelse memory = false [
-    let new.fishes eligible.fishes   ; if divers have no memory, then all fishes they see are counted
-    if any? new.fishes [
-    let new.records ([species] of new.fishes)
-    set counted.fishes sentence counted.fishes new.records
-    ]] [
   let diver.memory memory
-  let new.fishes eligible.fishes with [not member? who diver.memory] ; if memory is enabled, only fishes that were not previously counted are counted
+  let new.fishes eligible.fishes with [not member? who diver.memory] ; only fishes that are not remembered are counted
   if any? new.fishes [
     let new.records ([species] of new.fishes)
     set counted.fishes sentence counted.fishes new.records
     set memory sentence memory [who] of new.fishes
-  ]]
+  ]
     
+end
+
+to d.forget.fishes          ; runs if super memory is off
+  let seen.fish.id [who] of fishes in-cone max.visibility distransdiver.viewangle
+  let diver.memory memory
+  set memory filter [member? ? seen.fish.id] diver.memory
 end
 
 ;Timed transect diver procedures
@@ -370,22 +409,21 @@ end
 
 to t.count.fishes
   let myxcor xcor
-  let seen.fishes fishes in-cone visibility.length timetransdiver.viewangle
+  let seen.fishes fishes in-cone max.visibility timetransdiver.viewangle
   let eligible.fishes seen.fishes with [(xcor > myxcor - (timed.transect.width / 2)) and (xcor < myxcor + (timed.transect.width / 2))]  ; this only works for transects heading north, of course
-  ifelse memory = false [
-    let new.fishes eligible.fishes   ; if divers have no memory, then all fishes they see are counted
-    if any? new.fishes [
-    let new.records ([species] of new.fishes)
-    set counted.fishes sentence counted.fishes new.records
-    ]] [
   let diver.memory memory
-  let new.fishes eligible.fishes with [not member? who diver.memory] ; if memory is enabled, only fishes that were not previously counted are counted
+  let new.fishes eligible.fishes with [not member? who diver.memory] ; only fishes that are not remembered are counted
   if any? new.fishes [
     let new.records ([species] of new.fishes)
     set counted.fishes sentence counted.fishes new.records
     set memory sentence memory [who] of new.fishes
-  ]]
-    
+  ]
+end
+
+to t.forget.fishes          ; runs if super memory is off
+  let seen.fish.id [who] of fishes in-cone max.visibility timetransdiver.viewangle
+  let diver.memory memory
+  set memory filter [member? ? seen.fish.id] diver.memory
 end
 
 
@@ -398,19 +436,19 @@ end
 
 to s.count.fishes
   let eligible.fishes fishes in-cone stationary.radius statdiver.viewangle
-  ifelse memory = false [
-    let new.fishes eligible.fishes   ; if divers have no memory, then all fishes they see are counted
-    if any? new.fishes [
-    let new.records ([species] of new.fishes)
-    set counted.fishes sentence counted.fishes new.records
-    ]] [
   let diver.memory memory
-  let new.fishes eligible.fishes with [not member? who diver.memory] ; if memory is enabled, only fishes that were not previously counted are counted
+  let new.fishes eligible.fishes with [not member? who diver.memory] ; only fishes that are not remembered are counted
   if any? new.fishes [
     let new.records ([species] of new.fishes)
     set counted.fishes sentence counted.fishes new.records
     set memory sentence memory [who] of new.fishes
-  ]]
+  ]
+end
+
+to s.forget.fishes          ; runs if super memory is off
+  let seen.fish.id [who] of fishes in-cone stationary.radius statdiver.viewangle
+  let diver.memory memory
+  set memory filter [member? ? seen.fish.id] diver.memory
 end
 
 ;Roving diver procedures
@@ -421,7 +459,7 @@ to do.rdiver.movement
 end
 
 to r.count.fishes
-  let eligible.fishes fishes in-cone visibility.length statdiver.viewangle
+  let eligible.fishes fishes in-cone max.visibility statdiver.viewangle
   let diver.memory memory
   let new.fishes eligible.fishes with [not member? who diver.memory] ; only fishes that were not previously counted are counted
   if any? new.fishes [
@@ -430,6 +468,12 @@ to r.count.fishes
     set memory sentence memory [who] of new.fishes
   ]
     end
+
+to r.forget.fishes          ; runs if super memory is off
+  let seen.fish.id [who] of fishes in-cone max.visibility statdiver.viewangle
+  let diver.memory memory
+  set memory filter [member? ? seen.fish.id] diver.memory
+end
 
 ;reporters
 
@@ -456,11 +500,11 @@ end
 GRAPHICS-WINDOW
 475
 7
-898
-451
+720
+638
 -1
 -1
-1.033
+2.0
 1
 10
 1
@@ -471,9 +515,9 @@ GRAPHICS-WINDOW
 1
 1
 0
-399
+99
 0
-399
+299
 1
 1
 1
@@ -517,7 +561,7 @@ NIL
 BUTTON
 1041
 65
-1118
+1121
 98
 Go once
 go
@@ -533,9 +577,9 @@ NIL
 
 MONITOR
 910
-365
+370
 1010
-410
+415
 Total area (m2)
 actual.area
 0
@@ -592,16 +636,6 @@ stationary.turning.angle
 degrees / sec
 HORIZONTAL
 
-TEXTBOX
-290
-125
-440
-143
-Fish movement
-11
-0.0
-1
-
 CHOOSER
 26
 80
@@ -617,8 +651,8 @@ SLIDER
 233
 1077
 266
-visibility.length
-visibility.length
+max.visibility
+max.visibility
 5
 40
 13
@@ -643,58 +677,6 @@ NIL
 HORIZONTAL
 
 TEXTBOX
-397
-179
-426
-197
-m/s
-11
-0.0
-1
-
-INPUTBOX
-989
-169
-1067
-229
-fish.density
-0.2
-1
-0
-Number
-
-INPUTBOX
-905
-169
-984
-229
-numb.fishes
-32000
-1
-0
-Number
-
-TEXTBOX
-1074
-168
-1208
-202
-If this is >0, it has priority over numb.fishes
-11
-15.0
-1
-
-TEXTBOX
-1072
-200
-1222
-218
-sharks / m2
-11
-0.0
-1
-
-TEXTBOX
 127
 104
 153
@@ -707,19 +689,19 @@ m
 SWITCH
 907
 275
-1045
+1044
 308
-diver.memory?
-diver.memory?
-0
+super.memory?
+super.memory?
+1
 1
 -1000
 
 OUTPUT
-475
-455
-895
-550
+690
+480
+1110
+635
 12
 
 SLIDER
@@ -806,10 +788,10 @@ Select active sampling methods
 1
 
 SWITCH
-1103
-329
-1229
-362
+1100
+330
+1226
+363
 show.paths?
 show.paths?
 0
@@ -817,10 +799,10 @@ show.paths?
 -1000
 
 SWITCH
-908
-329
-1094
-362
+910
+330
+1096
+363
 show.diver.detail.windows?
 show.diver.detail.windows?
 1
@@ -840,28 +822,11 @@ Display options
 TEXTBOX
 1050
 280
-1200
-308
-Ability to remember counted sharks (usually on)
+1295
+305
+Ability to remember all counted fishes (If turned off, divers forget fishes that leave the FOV)
 11
 0.0
-1
-
-BUTTON
-905
-106
-1118
-150
-Setup with default parameter values
-set timed.transect.diver.speed 4\nset distance.transect.diver.speed 4\nset timed.transect.width 4\nset distance.transect.width 4\nset stationary.turning.angle 4\nset stationary.radius 7.5\nset timed.transect.diver? true\nset stationary.diver? true\nset roving.diver? false\nset roving.diver.speed 4\nset roving.diver.turning.angle 4\nset fish.mean.speed 1\nset fish.dir.angle 45\nset fish.density 0.2\nset visibility.length 13\nset transect.time 5\nset transect.distance 50\nset stationary.time 5\nset roving.time 5\nset diver.memory? true\nset show.diver.detail.windows? false\nset show.paths? true\nrun [setup]\n
-NIL
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
 1
 
 TEXTBOX
@@ -874,21 +839,11 @@ m
 0.0
 1
 
-TEXTBOX
-395
-245
-450
-263
-degrees
-11
-0.0
-1
-
 BUTTON
-900
-455
-985
-550
+1115
+480
+1200
+635
 Clear output
 clear-output
 NIL
@@ -900,28 +855,6 @@ NIL
 NIL
 NIL
 1
-
-INPUTBOX
-284
-142
-389
-202
-fish.mean.speed
-0.5
-1
-0
-Number
-
-INPUTBOX
-285
-207
-390
-267
-fish.dir.angle
-120
-1
-0
-Number
 
 BUTTON
 200
@@ -976,9 +909,9 @@ NIL
 
 BUTTON
 25
-515
-164
-548
+510
+195
+543
 Stop following divers
 reset-perspective
 NIL
@@ -989,36 +922,6 @@ NIL
 NIL
 NIL
 NIL
-1
-
-TEXTBOX
-910
-11
-1060
-53
-1. Press setup to populate the world and feed the parameters into the model
-11
-16.0
-1
-
-TEXTBOX
-1074
-10
-1224
-38
-2. Press Go to run the model until \"survey.time\" is reached
-11
-15.0
-1
-
-TEXTBOX
-1125
-108
-1219
-150
-Resets all values to defaults and runs setup
-11
-15.0
 1
 
 SWITCH
@@ -1143,6 +1046,81 @@ distance.transect.width
 distance.transect.width
 1 2 4 5 8 10 20
 0
+
+MONITOR
+905
+110
+1012
+155
+Total nr. of fishes
+numb.fishes
+0
+1
+11
+
+MONITOR
+1015
+110
+1097
+155
+Total density
+total.density
+3
+1
+11
+
+MONITOR
+1100
+110
+1212
+155
+Number of species
+nr.species
+17
+1
+11
+
+SLIDER
+260
+150
+465
+183
+behavior.change.interval
+behavior.change.interval
+1
+20
+10
+1
+1
+seconds
+HORIZONTAL
+
+TEXTBOX
+265
+130
+350
+148
+Fish movement
+11
+0.0
+1
+
+BUTTON
+260
+185
+465
+218
+Focus on a random fish
+let chosen.one one-of fishes\nfollow chosen.one\ninspect chosen.one
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
 
 @#$#@#$#@
 ## WHAT IS IT?
@@ -1637,209 +1615,6 @@ NetLogo 5.2.0
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
-<experiments>
-  <experiment name="How does fish speed affect relative bias?" repetitions="30" runMetricsEveryStep="false">
-    <setup>setup</setup>
-    <go>go</go>
-    <metric>t.bias-result</metric>
-    <metric>s.bias-result</metric>
-    <enumeratedValueSet variable="stationary.turning.angle">
-      <value value="4"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="shark.range.speed">
-      <value value="0"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="shark.density">
-      <value value="0.2"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="shark.mean.speed">
-      <value value="0"/>
-      <value value="0.0010"/>
-      <value value="0.01"/>
-      <value value="0.1"/>
-      <value value="0.2"/>
-      <value value="0.4"/>
-      <value value="0.6"/>
-      <value value="0.8"/>
-      <value value="1"/>
-      <value value="2"/>
-      <value value="4"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="survey.time">
-      <value value="300"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="range.speed">
-      <value value="0"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="diver.memory?">
-      <value value="true"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="transect.diver.speed">
-      <value value="4"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="shark.spread.speed">
-      <value value="0.1"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="shark.dir.angle">
-      <value value="45"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="transect.width">
-      <value value="4"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="time.step">
-      <value value="2"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="transect.diver.spread.speed">
-      <value value="5"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="visibility.length">
-      <value value="13"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="stationary.radius">
-      <value value="7.5"/>
-    </enumeratedValueSet>
-  </experiment>
-  <experiment name="Experiment 2: Influence of all parameters" repetitions="1" runMetricsEveryStep="false">
-    <setup>setup</setup>
-    <go>go</go>
-    <metric>t.bias-result</metric>
-    <metric>s.bias-result</metric>
-    <enumeratedValueSet variable="diver.memory?">
-      <value value="true"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="shark.mean.speed">
-      <value value="0"/>
-      <value value="0.0010"/>
-      <value value="0.01"/>
-      <value value="0.1"/>
-      <value value="0.2"/>
-      <value value="0.4"/>
-      <value value="0.6"/>
-      <value value="0.8"/>
-      <value value="1"/>
-      <value value="2"/>
-      <value value="4"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="time.step">
-      <value value="2"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="transect.width">
-      <value value="1"/>
-      <value value="2"/>
-      <value value="4"/>
-      <value value="5"/>
-      <value value="8"/>
-      <value value="10"/>
-      <value value="20"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="shark.spread.speed">
-      <value value="0.1"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="shark.density">
-      <value value="0.1"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="stationary.turning.angle">
-      <value value="4"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="transect.diver.spread.speed">
-      <value value="5"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="shark.range.speed">
-      <value value="0"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="visibility.length">
-      <value value="10"/>
-      <value value="20"/>
-      <value value="30"/>
-      <value value="40"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="shark.dir.angle">
-      <value value="1"/>
-      <value value="22.5"/>
-      <value value="45"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="transect.diver.speed">
-      <value value="1"/>
-      <value value="4"/>
-      <value value="7"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="range.speed">
-      <value value="0"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="stationary.radius">
-      <value value="7.5"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="survey.time">
-      <value value="60"/>
-      <value value="300"/>
-      <value value="600"/>
-      <value value="900"/>
-      <value value="1200"/>
-      <value value="1800"/>
-    </enumeratedValueSet>
-  </experiment>
-  <experiment name="How does fish speed affect relative bias? (count every second)" repetitions="30" runMetricsEveryStep="false">
-    <setup>setup</setup>
-    <go>go</go>
-    <metric>t.bias-result</metric>
-    <metric>s.bias-result</metric>
-    <enumeratedValueSet variable="stationary.turning.angle">
-      <value value="4"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="shark.range.speed">
-      <value value="0"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="shark.density">
-      <value value="0.2"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="shark.mean.speed">
-      <value value="0"/>
-      <value value="0.0010"/>
-      <value value="0.01"/>
-      <value value="0.1"/>
-      <value value="0.2"/>
-      <value value="0.4"/>
-      <value value="0.6"/>
-      <value value="0.8"/>
-      <value value="1"/>
-      <value value="2"/>
-      <value value="4"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="survey.time">
-      <value value="300"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="range.speed">
-      <value value="0"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="diver.memory?">
-      <value value="true"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="transect.diver.speed">
-      <value value="4"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="shark.spread.speed">
-      <value value="0.1"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="shark.dir.angle">
-      <value value="45"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="transect.width">
-      <value value="4"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="time.step">
-      <value value="1"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="transect.diver.spread.speed">
-      <value value="5"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="visibility.length">
-      <value value="13"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="stationary.radius">
-      <value value="7.5"/>
-    </enumeratedValueSet>
-  </experiment>
-</experiments>
 @#$#@#$#@
 @#$#@#$#@
 default
