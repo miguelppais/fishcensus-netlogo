@@ -384,14 +384,11 @@ to go
   if not super.memory? [ask divers [forget.fishes]]       ; if super memory is disabled, divers forget fishes they no longer see
 
 
-  ifelse ticks mod behavior.change.interval = 0 [
-    ask fishes [set behavior.set? false
-      set.behavior]                                      ; fishes set a new behavior in the end of the go procedure, every x seconds (determined by behavior.change.interval)
-  ] [ask fishes [
-    if detectability < 1 [
-      set visible? random-bernoulli detectability        ; if behavior.change procedure is not called (in which visible? is set), then just set visible? if detectability is lower than 1 (this changes every second and not every x seconds).
-      ]
-    ]
+  if ticks mod behavior.change.interval = 0 [
+    ask fishes [
+      set behavior.set? false
+      set.behavior
+      ]                                      ; fishes set a new behavior in the end of the go procedure, every x seconds (determined by behavior.change.interval)
   ]
   advance-clock
   tick
@@ -556,7 +553,7 @@ to set.behavior                                                        ; fish pr
     set predator.avoidance.w item 13 params
     set prey.chasing.w item 14 params
     set diver.avoidance.w item 15 params
-    if detectability < 1 [set visible? random-bernoulli detectability]
+    if detectability < 1 [set visible? random-bernoulli detectability]    ; visibility of individual fish is set when behavior changes, using a Bernoulli trial
     set behavior.set? true
     if any? schoolmates [
       ask schoolmates [

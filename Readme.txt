@@ -66,3 +66,7 @@ Species creator: all drag.formula parameters saved on output csv file. All files
 Error messages and import data procedure updated on the main model to account for new csv structure
 avoid.obstacle removed from movement model, since it was slowing down the model and was not being used
 Output values are now stored as global variables instead of reporters
+
+1.2
+Visibility is now established with behavior change (based on detectability), instead of every second.
+
