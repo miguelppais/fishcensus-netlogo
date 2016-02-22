@@ -1,3 +1,5 @@
+Changelog
+
 0.1
 Based on AnimDens NetLogo
 Change transect.diver to timed.transect.diver
