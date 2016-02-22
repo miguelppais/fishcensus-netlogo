@@ -7,46 +7,32 @@ extensions [
 
 globals[
   world.area
-  file.name                 ; species parameters input csv file name
   species.data              ; imported input data from the csv file
-  file.delimiter            ; delimiter for the csv file (user prompt)
   nr.species                ; number of species in the csv file. Variable updated by the go procedure
   total.density
   numb.fishes
-  timetransdiver.viewangle
-  distransdiver.viewangle
-  statdiver.viewangle
-  rovdiver.viewangle
   timed.transect.diver.mean.speed
   distance.transect.diver.mean.speed
   transect.time.secs
   stationary.time.secs
   roving.time.secs
   roving.diver.mean.speed
-  timed.transect.area
-  distance.transect.area
-  stationary.area
-  divers                    ; an agentset with all active divers
-  year                      ; variables for the model clock
-  season
-  month
-  day
-  hours
+  sampling.area
+  persons                   ; an agentset of diver and buddy
+  hours                     ; variables for the model clock
   minutes
   seconds
+  real.densities
+  snapshot.estimates
+  density.estimates
+  bias.estimates
 ]
 
 ;Agent types
 
 breed [fishes fish]
 
-breed [timetransdivers timetransdiver] ;timed belt transect diver
-
-breed [distransdivers distransdiver] ;fixed distance transect diver
-
-breed [statdivers statdiver] ;stationary point count diver
-
-breed [rovdivers rovdiver] ;roving diver     ; roving divers can't calculate densities accurately, yet they can estimate species richness and frequency of occurence.
+breed [divers diver]
 
 breed [buddies buddy]
 
@@ -57,7 +43,6 @@ fishes-own [                     ; fish variables
   current.behavior               ; picked from behavior.list
   behavior.set?                  ; boolean that tells if fish has set its behavior this turn
   schoolmates                    ; for schooling species, agentset of nearby fishes
-  nearest-neighbor               ; closest schoolmate
   velocity                       ; vector with x and y components determined by the previous velocity and the current acceleration at each step
   acceleration                   ; vector with x and y components, determined by the sum of all urges
   species                        ; this separates the different types within the fish breed. This is the variable recorded by divers while counting
@@ -74,7 +59,8 @@ fishes-own [                     ; fish variables
   patch.gathering.w              ; weighs the urge to gather at a feeding patch
   perception.dist                ; fish perception distance
   perception.angle               ; fish perception angle (360 for full directional awareness)
-  max.velocity                   ; maximum attainable velocity
+  max.sustained.speed            ; maximum attainable velocity with low energy consumption (cruise)
+  burst.speed                    ; maximum attainable velocity with high energy consumption (chase and escape)
   max.acceleration               ; maximum attainable acceleration
   diver.avoidance.w              ; weighs the urge to avoid divers. If negative, fish are attracted to divers
   predator.avoidance.w           ; weighs the urge to avoid fish with prey.type = "fish"
@@ -89,79 +75,52 @@ fishes-own [                     ; fish variables
   schooling?                     ; boolean variable that determines if fish exhibit schooling behavior
 ]
 
-timetransdivers-own [            ; timed transect diver variables
+
+divers-own [             ; distance transect diver variables
   counted.fishes
   snapshot.fishes
-  density.estimates
   speed
   memory
-  t.bias
+  viewangle
+  initial.ycor                   ; for distance transects                 
+  final.ycor                     ; for distance transects
   finished?
 ]
 
-distransdivers-own [             ; distance transect diver variables
-  counted.fishes
-  snapshot.fishes
-  density.estimates
-  speed
-  memory
-  initial.ycor                   
-  final.ycor
-  d.bias
-  finished?
-]
-
-
-statdivers-own [                 ; stationary diver variables
-  counted.fishes
-  snapshot.fishes
-  density.estimates
-  memory
-  s.bias
-  finished?
-]
-
-rovdivers-own [                  ; roving diver variables
-  counted.fishes
-  counts.per.species
-  speed
-  memory
-  finished?
-]
-
-buddies-own [
-  finished?                ; these variables are set for all members of "divers" agentset, so they must be buddy variables even if they are not used.
-  memory
-]
 
 ;Interface procedures
 
+
 to import-dataset       ; imports species data from a .csv file to global variable species.data
   output-print "Importing species data..."
-  set file.name (word user-input "Name of the .csv file with species parameters? (exclude extension)" ".csv")
-  set file.delimiter user-input "Delimiter symbol in the .csv file? (usually , or ;)"               ; a window prompts for the csv file delimiter
-  carefully [set species.data (csv:from-file file.name file.delimiter)                                         ; import csv file into a list of lists
+  let file.name (word user-input "Name of the .csv file with species parameters? (exclude extension)" ".csv")
+  let file.delimiter user-input "Delimiter symbol in the .csv file? (usually , or ;)"               ; a window prompts for the csv file delimiter
+  if file.delimiter = "" [user-message "ERROR: Delimiter not specified. Please write the csv column delimiter (usually , or ;) when prompted." stop]   ; ERROR MESSAGE
+  carefully [set species.data (csv:from-file file.name file.delimiter)]                             ; import csv file into a list of lists
+  [user-message (word "File " file.name " not found in model folder.") stop] ; ERROR MESSAGE
   if length species.data < 2 [user-message "ERROR: input file has only 1 row or is empty. Check if input file has a header plus 1 line per species." stop] ; ERROR MESSAGE
-  let delimiter.check item 0 species.data
-  if length delimiter.check = 1 [user-message "ERROR: unable to separate parameters in the file. Probably wrong delimiter picked." stop] ; ERROR MESSAGE
+  if length item 0 species.data != 77 [user-message "ERROR: unable to separate parameters in the file. Ensure the correct delimiter was picked." stop] ; ERROR MESSAGE
   set nr.species length species.data - 1                                                            ; all filled lines minus the header
-  ifelse user-yes-or-no? (word "Detected " nr.species " species. Is this correct?") [
+  set real.densities []                                                                             ; resets real.densities
+  ifelse user-yes-or-no? (word "Detected " nr.species " species. Is this correct?") [               ; confirm number of species in the file
     user-message "Species data imported. Press setup."
-    output-print "Data successfully loaded."] [                                                     ; confirm number of species in the file
+    output-print "Data successfully loaded."
+    foreach n-values nr.species [? + 1] [
+      let sp.param item ? species.data
+      let name item 0 sp.param
+      let real.dens.pair list name item 4 sp.param
+      set real.densities lput real.dens.pair real.densities
+    ]
+  ] [  ; middle of user-yes-or-no                                                 
   user-message "Check if input file has a header plus 1 line per species."                          ; ERROR MESSAGE
   output-print "Number of species incorrectly identified. Check file."
-  stop]]
-  [user-message (word "File " file.name " not found in model folder.") stop]
+  stop] ; end of user-yes-or-no
 end
 
 to setup
   if species.data = 0 [user-message "You need to import a dataset first. Import the example.csv file or create one using the species creator." stop] ; ERROR MESSAGE
   if fixed.seed? [random-seed seed]
   clear-ticks                                          ; reset model clock and clear everything except global variables (or else it would erase species.data and nr.species)
-  set year 1
-  set season 1
-  set month 1
-  set day 1
   set hours 0
   set minutes 0
   set seconds 0
@@ -170,51 +129,60 @@ to setup
   clear-drawing
   clear-all-plots
   stop-inspecting-dead-agents                           ; clears diver detail windows from previous simulation runs
-  output-print "Drawing display grid..."
   ask patches with [pycor mod 2 = 0 and pxcor mod 2 = 0] [set pcolor 103]
   ask patches with [pycor mod 2 = 1 and pxcor mod 2 = 1] [set pcolor 103]
   ask patches with [pcolor = black] [set pcolor 105]
-  output-print "Calculating global constants..."
   set world.area world-height * world-width
-  set timetransdiver.viewangle 180                      ; sets viewangles for all divers
-  set distransdiver.viewangle 180
-  set statdiver.viewangle 160
-  set rovdiver.viewangle 160
   set transect.time.secs transect.time * 60             ; convert survey times from minutes to seconds
   set stationary.time.secs stationary.time * 60
   set roving.time.secs roving.time * 60
   set timed.transect.diver.mean.speed (timed.transect.diver.speed / 60)  ; these lines just convert interface speeds (in m/min) to m/s
   set distance.transect.diver.mean.speed (distance.transect.diver.speed / 60)
   set roving.diver.mean.speed (roving.diver.speed / 60)
-  set divers no-turtles                                                  ; resets the "divers" agentset (otherwise it would be set to 0 and generate errors during setup)
+  set density.estimates []
+  set snapshot.estimates []
+  set bias.estimates []
+  set persons no-turtles                                                  ; resets the "persons" agentset (otherwise it would be set to 0 and generate errors during setup)
   
 ; for the timed transect, the sampled area is distance * width plus max visibility * width at the end (an approximation that ignores the fact that visibility is the radius of a circle).
 
-  set timed.transect.area timed.transect.width * (timed.transect.diver.mean.speed * transect.time.secs) + (timed.transect.width * max.visibility)
+  if sampling.method = "Fixed time transect" [
+    set sampling.area timed.transect.width * (timed.transect.diver.mean.speed * transect.time.secs) + (timed.transect.width * max.visibility)
+  ]
   
 ; for the distance transect, the sampled area is only distance * width
   
-  set distance.transect.area distance.transect.width * transect.distance
+  if sampling.method = "Fixed distance transect" [
+    set sampling.area distance.transect.width * transect.distance
+  ]
   
 ; for the stationary diver, it is the area of the circle around the diver
   
-  set stationary.area pi * stationary.radius ^ 2
+  if sampling.method = "Stationary point count" [
+    set sampling.area pi * stationary.radius ^ 2
+  ]
+  
+; the roving diver only records counts, so sampling area can be set to 1
+
+  if sampling.method = "Random path" [
+    set sampling.area 1
+  ]
  
 ; read the information stored in species.data to place fishes 
   
   output-print "Placing fishes..."
   foreach n-values nr.species [? + 1] [           ; loop that creates fish for each species and sets all fish variables
     let sp.param item ? species.data
-    let sp.density item 4 sp.param
-    create-fishes (sp.density * world.area) [
+    ifelse override.density = 0 [set total.density item 4 sp.param]
+    [set total.density override.density]
+    create-fishes (total.density * world.area) [
       setxy random-xcor random-ycor
       set velocity [0 0]
       set acceleration [0 0]
       set picked.patch false
       set schoolmates no-turtles                  ; sets schoolmates as an empty agentset
-      set nearest-neighbor nobody
       set species item 0 sp.param
-      if length sp.param != 76 [user-message (word "ERROR: species number " ? " '" species "' has a parameter list that is incomplete or too long. Check file.") stop] ; ERROR MESSAGE
+      if length sp.param != 77 [user-message (word "ERROR: species number " ? " '" species "' has a parameter list that is incomplete or too long. Check file.") stop] ; ERROR MESSAGE
       set shape item 1 sp.param
       set size item 2 sp.param
       set drag.formula (-11297 / (20600 * (size ^ 0.8571))) ; if size is fixed, this can be fixed too.
@@ -225,22 +193,23 @@ to setup
       set perception.angle item 8 sp.param
       set prey.type item 9 sp.param
       set max.acceleration item 10 sp.param
-      set max.velocity item 11 sp.param
-      set behavior.list (list item 12 sp.param item 28 sp.param item 44 sp.param item 60 sp.param)
-      set behavior.freqs (list item 13 sp.param item 29 sp.param item 45 sp.param item 61 sp.param)
+      set max.sustained.speed item 11 sp.param
+      set burst.speed item 12 sp.param
+      set behavior.list (list item 13 sp.param item 29 sp.param item 45 sp.param item 61 sp.param)
+      set behavior.freqs (list item 14 sp.param item 30 sp.param item 46 sp.param item 62 sp.param)
       if reduce + behavior.freqs != 1 [
        user-message (word "ERROR! Behavior frequencies for " species " do not add up to 1.") stop]   ; ERROR MESSAGE
       set behavior.params (list                                ; lists parameter values for all 4 behaviors
-        sublist sp.param 12 28
-        sublist sp.param 28 44
-        sublist sp.param 44 60
-        sublist sp.param 60 76)
+        sublist sp.param 13 29
+        sublist sp.param 29 45
+        sublist sp.param 45 61
+        sublist sp.param 61 77)
       set visible? true
       set behavior.set? false
       set.behavior                          ; fish procedure that draws the starting behavior from the list and fills in parameters
     ]
   ]
-  set total.density (count fishes / world.area)
+  set total.density (count fishes / world.area) ; this takes into account the actual number of fishes in the area, and not the original input number.
   set numb.fishes count fishes
   output-print (word "Imported " count fishes " fishes belonging to " nr.species " species,")
   output-print (word "with a total density of " total.density " fish per square meter.")
@@ -251,16 +220,17 @@ to setup
   output-print "Placing diver..."
   
 if sampling.method = "Fixed time transect" [                                         ;timed transect diver setup
-  create-timetransdivers 1 [
+  create-divers 1 [
  set heading 0
  set shape "diver"
  set color cyan
  set size 2
- setxy (world-width / 2) (world-height / 4)
+ setxy (world-width / 2) 5
  if show.paths? = true [pen-down]                                                           ;this shows the path of the diver
  set speed timed.transect.diver.mean.speed
+ set viewangle 180
  set counted.fishes [] ; sets counted.fishes as an empty list
- set density.estimates [] ; sets density.estimates as an empty list
+ ;set density.estimates [] ; sets density.estimates as an empty list
  set snapshot.fishes ([species] of (fishes with [(xcor >= (world-width / 2) - timed.transect.width) and (xcor <= (world-width / 2) + timed.transect.width) and (ycor >= (world-height / 4)) and (ycor <= ((world-height / 4) + (transect.time * timed.transect.diver.speed)))]))
   ]
   if buddy? [
@@ -269,24 +239,25 @@ if sampling.method = "Fixed time transect" [                                    
     set shape "diver"
     set color cyan
     set size 2
-    setxy ([xcor] of one-of timetransdivers + 1) ([ycor] of one-of timetransdivers - 1) 
+    setxy ([xcor] of one-of divers + 1) ([ycor] of one-of divers - 1) 
    ] 
   ]
 ]
 
 if sampling.method = "Fixed distance transect" [                                         ;distance transect diver setup
-  create-distransdivers 1 [
+  create-divers 1 [
  set heading 0
  set shape "diver"
  set color green
  set size 2
- setxy (world-width / 2) (world-height / 4)
+ setxy (world-width / 2) 5
  if show.paths? = true [pen-down]                                                           ;this shows the path of the diver
  set speed distance.transect.diver.mean.speed
+ set viewangle 180
  set initial.ycor ycor                                                              ; fixed distance transect divers record their start and end points as given by "transect.distance" initially
  set final.ycor ycor + transect.distance                                            ; because coordinates are in meters
  set counted.fishes [] ; sets counted.fishes as an empty list
- set density.estimates [] ; sets density.estimates as an empty list
+ ;set density.estimates [] ; sets density.estimates as an empty list
  set snapshot.fishes ([species] of (fishes with [(xcor >= (world-width / 2) - distance.transect.width) and (xcor <= (world-width / 2) + distance.transect.width) and (ycor >= (world-height / 4)) and (ycor <= ((world-height / 4) + (transect.distance)))]))
   ]
   if buddy? [
@@ -295,20 +266,21 @@ if sampling.method = "Fixed distance transect" [                                
     set shape "diver"
     set color green
     set size 2
-    setxy ([xcor] of one-of distransdivers + 1) ([ycor] of one-of distransdivers - 1) 
+    setxy ([xcor] of one-of divers + 1) ([ycor] of one-of divers - 1) 
    ] 
   ]
 ]
 
 if sampling.method = "Stationary point count" [                                               ;stationary diver setup
-  create-statdivers 1 [
+  create-divers 1 [
  set heading 0
  set shape "diver"
  set color red
  set size 2
- setxy (world-width / 2) (world-height / 4)
+ setxy (world-width / 2) (world-height / 2)
+ set viewangle 160
  set counted.fishes [] ; sets counted.fishes as an empty list
- set density.estimates [] ; sets density.estimates as an empty list
+ ;set density.estimates [] ; sets density.estimates as an empty list
  set snapshot.fishes ([species] of (fishes in-radius stationary.radius))
 ]
   if buddy? [
@@ -317,22 +289,23 @@ if sampling.method = "Stationary point count" [                                 
     set shape "diver"
     set color red
     set size 2
-    setxy ([xcor] of one-of statdivers + 1) ([ycor] of one-of statdivers - 1) 
+    setxy ([xcor] of one-of divers + 1) ([ycor] of one-of divers - 1) 
    ] 
   ]
 ]
 
-if sampling.method = "Roving" [                                                      ;roving diver setup
-  create-rovdivers 1 [
+if sampling.method = "Random path" [                                                      ;roving diver setup
+  create-divers 1 [
  set heading 0
  set shape "diver"
  set color magenta
  set size 2
- setxy (world-width / 2) (world-height / 4)
+ setxy (world-width / 2) 5
  if show.paths? = true [pen-down]                                                           ;this shows the path of the diver
  set speed roving.diver.mean.speed
+ set viewangle 160
  set counted.fishes [] ; sets counted.fishes as an empty list
- set counts.per.species []  ; sets counts.per.species as an empty list
+ set snapshot.fishes []  ; sets snapshot.fishes as an empty list (no snapshot possible for roving divers, as their path is random)
 ]
   if buddy? [
    create-buddies 1 [
@@ -340,12 +313,12 @@ if sampling.method = "Roving" [                                                 
     set shape "diver"
     set color magenta
     set size 2
-    setxy ([xcor] of one-of rovdivers + 1) ([ycor] of one-of rovdivers - 1) 
+    setxy ([xcor] of one-of divers + 1) ([ycor] of one-of divers - 1) 
    ] 
   ]
 ]
 
-set divers (turtle-set timetransdivers distransdivers statdivers rovdivers buddies) ; creates the agentset containing all divers (all methods)
+set persons (turtle-set divers buddies) ; creates the agentset containing divers and buddies
 
 ask divers [                                                    
  set finished? false                                            ; reset the "finished?" variable
@@ -358,104 +331,71 @@ reset-ticks
 
 ; open diver detail window
 
-if show.diver.detail.window? = true [
-  if any? timetransdivers [inspect one-of timetransdivers]         ; need to use "if any?" because inspect will return an error if it finds nobody
-  if any? distransdivers [inspect one-of distransdivers]
-  if any? statdivers [inspect one-of statdivers]
-  if any? rovdivers [inspect one-of rovdivers]
-]
+if show.diver.detail.window? = true [inspect one-of divers]
+
 end ;of setup procedure
 
 
 to go
-  if count divers = count divers with [finished?] [             
+  if count divers = count divers with [finished?] [                                                               ; do.outputs and stop if diver is finished      
     do.outputs
     stop]                                  
-  if stationary.radius > max.visibility [
-   output-print "ERROR: stationary.radius is set to a value greater than max.visibility"              ; if the stationary radius is higher than visibility, stop and output an error description
-   output-print "The diver will not be able to see the sample area"
-   output-print "Stopping simulation"
+  if sampling.method = "Stationary point count" and stationary.radius > max.visibility [
+   user-message "ERROR: stationary.radius is greater than max.visibility. Diver will not be able to see the sample area."              ; if the stationary radius is higher than visibility, stop and output an error description«
    stop 
   ]
   
   
-  ask timetransdivers [                                                                  ; divers count the fishes, unless they are finished
-   if not finished? [t.count.fishes]
-   ]
-
-  ask distransdivers [
-   if not finished? [d.count.fishes] 
+  if sampling.method = "Fixed distance transect" [ask divers [                              ; divers count the fishes and then check if finishing conditions are met
+      d.count.fishes
+      set finished? ycor > final.ycor
+      ]
+  ]          
+  if sampling.method = "Fixed time transect" [ask divers [
+      t.count.fishes
+      set finished? ticks > transect.time.secs
+      ]
   ]
-  
-  ask statdivers [
-    if not finished? [s.count.fishes]
+  if sampling.method = "Stationary point count" [ask divers [
+      s.count.fishes
+      set finished? ticks > stationary.time.secs
+      ]
   ]
-
-  ask rovdivers [
-    if not finished? [r.count.fishes]
+  if sampling.method = "Random path" [ask divers [
+      r.count.fishes
+      set finished? ticks > roving.time.secs
+      ]
   ]
+ 
     
   
   repeat movement.time.step [
   
-  ask timetransdivers [                                           ; move the divers
-    ifelse ticks > transect.time.secs [                           ; if their end of sampling conditions are met, set variable "finished?" to "true" and stop moving
-     set finished? true 
-     set label "finished"
-     if any? buddies [ask buddies [set finished? true]]
-    ] [
-    do.tdiver.movement
-    ]
-  ]
- 
-  ask distransdivers [
-    ifelse ycor > final.ycor [
-     set finished? true 
-     set label "finished"
-     if any? buddies [ask buddies [set finished? true]]
-    ] [
-    do.ddiver.movement
-    ]
-  ]
+  if sampling.method = "Fixed distance transect" [ask divers [do.ddiver.movement]]         ; move the diver
+  if sampling.method = "Fixed time transect" [ask divers [do.tdiver.movement]]
+  if sampling.method = "Stationary point count" [ask divers [do.stdiver.movement]]
+  if sampling.method = "Random path" [ask divers [do.rdiver.movement]]
 
-  ask statdivers [
-    ifelse ticks > stationary.time.secs [
-     set finished? true
-     set label "finished"
-     if any? buddies [ask buddies [set finished? true]]
-    ] [
-    do.stdiver.movement
-    ]
-  ]
-
-  ask rovdivers [
-    ifelse ticks > roving.time.secs [
-     set finished? true 
-     set label "finished"
-     if any? buddies [ask buddies [set finished? true]]
-    ] [
-    do.rdiver.movement
-    ]
-  ]
   
-  ask buddies [                                                                           ; move the buddies
-   set heading [heading] of one-of other divers
-   setxy ([xcor] of one-of other divers + 1) ([ycor] of one-of other divers - 1) 
+  ask buddies [                                                                           ; move the buddy
+   move-to one-of divers
+   set heading [heading] of one-of divers
+   rt 135 fd sqrt 2                           ; keep 1m behind and 1m to the right of the diver
+   set heading [heading] of one-of divers
+   
   ]
 
-  ask fishes [                                                      ; move the fishes                                                     
+  ask fishes [                                                                            ; move the fishes                                                     
     do.fish.movement
     ]
   if smooth.animation? [display]
-  ] ; closes repeat movement.time.step                  
+  ] ; closes repeat movement.time.step  
+  
+  if sampling.method = "Random path" and ticks mod 2 = 0 [
+    ask divers[set heading heading + random-float-between (- roving.diver.turning.angle) roving.diver.turning.angle]]         ;random path turning happens every 2 seconds (must be out of the "repeat" cycle)           
 
 
-  if not super.memory? [                                          ; if super memory is disabled, divers forget fishes they no longer see (a kind of "doorway effect")
-   ask timetransdivers [t.forget.fishes]
-   ask distransdivers [d.forget.fishes]
-   ask statdivers [s.forget.fishes]
-   ask rovdivers [r.forget.fishes] 
-  ]
+  if not super.memory? [ask divers [forget.fishes]]       ; if super memory is disabled, divers forget fishes they no longer see
   
   
   ifelse ticks mod behavior.change.interval = 0 [ 
@@ -476,10 +416,6 @@ to advance-clock
   set seconds seconds + 1
   if seconds = 60 [set minutes minutes + 1 set seconds 0]
   if minutes = 60 and seconds = 0 [set hours hours + 1 set minutes 0]
-  if hours = 24 and minutes = 0 and seconds = 0 [set day day + 1 set hours 0]
-  if day = 31 and hours = 0 and minutes = 0 and seconds = 0 [set month month + 1 set day 1]
-  if month = 13 and day = 1 and hours = 0 and minutes = 0 and seconds = 0 [set year year + 1 set month 1 set season 1]
-  if month != 1 and (month - 1) mod 3 = 0 and day = 1 and hours = 0 and minutes = 0 and seconds = 0 [set season season + 1]
 end
 
 
@@ -487,70 +423,39 @@ end
 ;OBSERVER PROCEDURES
 
 to do.outputs
-  ask timetransdivers [
-    let real.count length counted.fishes
-    let expected.count length snapshot.fishes
-    set t.bias (real.count - expected.count) / expected.count
-    output-print word "Timed transect diver bias was " precision t.bias 2            ; outputs bias with 2 decimal places
+  ask divers [
     output-print "Density estimates:"
     foreach n-values nr.species [? + 1] [
     let sp.param item ? species.data
     let name item 0 sp.param
-    let sp.dens.pair list name (occurrences name counted.fishes / timed.transect.area)
+    let sp.dens.pair list name precision (occurrences name counted.fishes / sampling.area) 3
     set density.estimates lput sp.dens.pair density.estimates
     output-print (word first sp.dens.pair ": " last sp.dens.pair)
     ]
+    output-print "Bias due to non-instantaneous sampling:"
+    foreach n-values nr.species [? + 1] [
+    let sp.param item ? species.data
+    let name item 0 sp.param
+    let snapshot.dens.pair list name precision (occurrences name snapshot.fishes / sampling.area) 3
+    set snapshot.estimates lput snapshot.dens.pair snapshot.estimates ; this just stores snapshot densities in a variable
+    ifelse last snapshot.dens.pair = 0 [
+      let bias.pair list name "n/a"       ; if snapshot.density is 0, do not calculate bias due to non-instantaneous sampling
+      set bias.estimates lput bias.pair bias.estimates ; this just stores bias estimates in a variable
+      output-print (word first bias.pair ": " last bias.pair)
+      ] [
+      let bias.pair list name precision (((last snapshot.dens.pair) - (last item (? - 1) density.estimates)) / (last snapshot.dens.pair)) 3 ; bias is calculated as (counted density - snapshot density) / snapshot density
+      set bias.estimates lput bias.pair bias.estimates ; this just stores bias estimates in a variable
+      output-print (word first bias.pair ": " last bias.pair)
+      ]
+      ]
   ]
-  
-  ask distransdivers [
-    let real.count length counted.fishes
-    let expected.count length snapshot.fishes
-    set d.bias (real.count - expected.count) / expected.count
-    output-print word "Distance transect diver bias was " precision d.bias 2         ; outputs bias with 2 decimal places
-    output-print "Density estimates:"
-    foreach n-values nr.species [? + 1] [
-    let sp.param item ? species.data
-    let name item 0 sp.param
-    let sp.dens.pair list name (occurrences name counted.fishes / distance.transect.area)
-    set density.estimates lput sp.dens.pair density.estimates
-    output-print (word first sp.dens.pair ": " last sp.dens.pair)
-    ]
-  ]
-  
- ask statdivers [
-    let real.count length counted.fishes
-    let expected.count length snapshot.fishes
-    set s.bias (real.count - expected.count) / expected.count
-    output-print word "Stationary diver bias was " precision s.bias 2                ; outputs bias with 2 decimal places
-    output-print "Density estimates:"
-    foreach n-values nr.species [? + 1] [
-    let sp.param item ? species.data
-    let name item 0 sp.param
-    let sp.dens.pair list name (occurrences name counted.fishes / stationary.area)  
-    set density.estimates lput sp.dens.pair density.estimates
-    output-print (word first sp.dens.pair ": " last sp.dens.pair)
-    ]
- ]
- 
- ask rovdivers [
-    let real.count length counted.fishes
-    output-type "Roving diver swam " output-type roving.time.secs * roving.diver.mean.speed output-type "m and counted " output-type real.count output-print " fishes"                    ; the roving diver only tells how many fishes it counted
-    output-print "Counts per species:"
-    foreach n-values nr.species [? + 1] [
-    let sp.param item ? species.data
-    let name item 0 sp.param
-    let count.pair list name (occurrences name counted.fishes)  
-    set counts.per.species lput count.pair counts.per.species
-    output-print (word first count.pair ": " last count.pair)
-    ]    
- ]
-end
+end ; of do.outputs
 
 
 ;FISH PROCEDURES
 
 
-;fish movement model
+;fish movement submodel
 
 to do.fish.movement
   if schooling? [set schoolmates other fishes in-cone perception.dist perception.angle with [species = [species] of myself]]    ; if schooling is true,look for conspecifics in my vicinity
@@ -581,11 +486,19 @@ to do.fish.movement
 
   set velocity (add velocity acceleration)                                                       ; the new velocity of the fish is sum of the acceleration and the old velocity.
 
-  if magnitude velocity > max.velocity                                                           ; keep the velocity within the accepted range
+  ifelse (any? fishes in-cone approach.dist perception.angle with [species != [species] of myself and prey.type = "fish"]) or       ; keep velocity within accepted range. When near threats, use burst.speed as limit.
+  (any? persons in-cone approach.dist perception.angle) [
+   if magnitude velocity > burst.speed [
+     set velocity (scale burst.speed normalize velocity)
+     ]
+  ] [
+  
+  if magnitude velocity > max.sustained.speed
   [ set velocity
     (scale
-        max.velocity
+        max.sustained.speed
         normalize velocity) ]
+  ]
 
   let nxcor xcor + ( first velocity )
   let nycor ycor + ( last velocity )
@@ -601,7 +514,7 @@ end
 
 to pick.patch                                                          ;fish procedure
   if picked.patch = false [
-   let chosen.patch one-of patches in-cone picked.patch.dist perception.angle
+   let chosen.patch patch-ahead 2 ; one-of patches in-cone 4 perception.angle
    
    if [pxcor] of chosen.patch > (world-width - (picked.patch.dist + 1)) [                                              ; create a (picked.patch.dist + 1) -wide buffer so that picked patches are not too close to the edges
     let new.chosen.patch patch ([pxcor] of chosen.patch - (picked.patch.dist + 1)) ([pycor] of chosen.patch)
@@ -625,7 +538,7 @@ to pick.patch                                                          ;fish pro
     ask schoolmates [
      set picked.patch chosen.patch 
     ]
-   ]]  
+   ]]
 end
 
 ;procedure that selects a new behavior and fills in behavior parameters
@@ -710,13 +623,13 @@ to-report align-urge ;; fish reporter
   ;; from my school mates
   if count schoolmates = 0 or align.w = 0
   [ report (list 0 0) ]
-  report normalize (
+  report
     ( map
       [ ?1 - ?2 ]
       (list
         mean [ first velocity ] of schoolmates   ; x component
         mean [ last velocity ] of schoolmates )  ; y component
-      velocity ))
+      velocity )
 end
 
 to-report rest-urge ;; fish reporter
@@ -764,26 +677,24 @@ to-report avoid-obstacle-urge ;; fish reporter
 end
 
 to-report avoid-predator-urge ;; fish reporter
-; a normalized vector that is opposite to the position of the predator,
-; and scale it by the inverse of the squared distance to the predator, as a proportion of approach.dist
+; a normalized vector that is opposite to the position of the closest predator
  let urge (list 0 0)
   if predator.avoidance.w = 0 [ report urge ]
-  ask other fishes in-cone approach.dist perception.angle with [prey.type = "fish"]
-  [ let real.dist magnitude (subtract (list [xcor] of myself [ycor] of myself) (list xcor ycor))
-    set urge scale ([approach.dist] of myself ^ 2 / real.dist) (normalize (add urge subtract (list [xcor] of myself [ycor] of myself) (list xcor ycor)))   ; WHAT IF REAL DIST IS ZERO?!!
-  ]
+  let predators fishes in-cone approach.dist perception.angle with [species != [species] of myself and prey.type = "fish"]
+  if any? predators [ask min-one-of predators [distance myself]
+  [set urge normalize (add urge subtract (list [xcor] of myself [ycor] of myself) (list xcor ycor))
+    ]]
   report urge
 end
 
 to-report avoid-diver-urge ;; fish reporter
-; a normalized vector that is opposite to the position of the diver,
-; and scale it by the inverse of the squared distance to the diver, as a proportion of approach.dist
+; a normalized vector that is opposite to the position of the closest person
  let urge (list 0 0)
   if diver.avoidance.w = 0 [ report urge ]
-  ask divers in-cone approach.dist perception.angle 
-  [ let real.dist magnitude (subtract (list [xcor] of myself [ycor] of myself) (list xcor ycor))
-    set urge scale ([approach.dist] of myself ^ 2 / real.dist) (normalize (add urge subtract (list [xcor] of myself [ycor] of myself) (list xcor ycor)))
-  ]
+  let threats persons in-cone approach.dist perception.angle                        ; persons is an agenteset that includes divers and buddies
+  if any? threats [ask min-one-of threats [distance myself]
+  [set urge normalize (add urge subtract (list [xcor] of myself [ycor] of myself) (list xcor ycor))
+    ]]
   report urge
 end
 
@@ -813,113 +724,111 @@ end
 
 ;DIVER PROCEDURES
 
-;Distance transect diver procedures
+;movement
 
-to do.ddiver.movement
+to do.ddiver.movement           ; fixed distance transect diver movement
   fd speed / movement.time.step ; each step is a second, so the speed is basically the distance divided by the movement.time.step
 end
 
-to d.count.fishes                      ; for fixed distance transects, there is a limit to the y coordinate (the diver doesn't count beyond the end mark of the transect)
+to do.tdiver.movement           ; fixed time transect diver movement
+  fd speed / movement.time.step ; each step is a second, so the speed is basically the distance divided by the movement.time.step
+end
+
+to do.stdiver.movement          ; stationary point count diver movement
+  set heading heading + (stationary.turning.angle / movement.time.step)        ; turns clockwise at a constant speed (in degrees per second)
+end
+
+to do.rdiver.movement           ; roving diver movement NOTE: turning happens every two seconds, so this part is coded separately in the go procedure
+  fd speed / movement.time.step ; each step is a second, so the speed is basically the distance divided by the movement.time.step
+end
+
+;count procedures
+
+to d.count.fishes                      ; for fixed distance transects, there is a limit to the y coordinate (the diver does not count beyond the end mark of the transect)
   let myxcor xcor
   let my.final.ycor final.ycor
-  let seen.fishes fishes in-cone max.visibility distransdiver.viewangle
+  let seen.fishes fishes in-cone max.visibility viewangle
   let eligible.fishes seen.fishes with [(xcor > myxcor - (distance.transect.width / 2)) and (xcor < myxcor + (distance.transect.width / 2)) and (ycor < my.final.ycor)]  ; distance transects have a limit in ycor as well
-  let identifiable.fishes eligible.fishes with [visible.dist <= distance myself and visible?]      ; only fish that are closer to the diver than their visible.dist and are visible are counted
+  let identifiable.fishes eligible.fishes with [visible.dist >= distance myself and visible?]      ; only fish that within their visible.dist and are visible are counted
   let diver.memory memory
-  let new.fishes identifiable.fishes with [not member? who diver.memory] ; only fishes that are not remembered are counted
-  if any? new.fishes [
-    let new.records ([species] of new.fishes)
+  let new.fishes (identifiable.fishes with [not member? who diver.memory]) ; only fishes that are not remembered are counted
+  ifelse count new.fishes > count.saturation [                       ; even if there are more, only the max number of fishes per second is counted (count.saturation)
+    let new.records ([species] of min-n-of count.saturation new.fishes [distance myself]) ; priority is given to closest fishes
     set counted.fishes sentence counted.fishes new.records
     set memory sentence memory [who] of new.fishes
-  ]
-    
-end
-
-to d.forget.fishes          ; runs if super memory is off
-  let seen.fish.id [who] of fishes in-cone max.visibility distransdiver.viewangle
-  let diver.memory memory
-  set memory filter [member? ? seen.fish.id] diver.memory
-end
-
-;Timed transect diver procedures
-
-to do.tdiver.movement
-  fd speed / movement.time.step ; each step is a second, so the speed is basically the distance divided by the movement.time.step
+  ] [
+  if any? new.fishes [                                      ; if there are new fishes, but they do not exceed count.saturation, just count them
+    let new.records ([species] of new.fishes) 
+    set counted.fishes sentence counted.fishes new.records
+    set memory sentence memory [who] of new.fishes
+  ]]
 end
 
 to t.count.fishes
   let myxcor xcor
-  let seen.fishes fishes in-cone max.visibility timetransdiver.viewangle
-  let eligible.fishes seen.fishes with [(xcor > myxcor - (timed.transect.width / 2)) and (xcor < myxcor + (timed.transect.width / 2))]  ; this only works for transects heading north, of course
-  let identifiable.fishes eligible.fishes with [visible.dist <= distance myself and visible?]
+  let seen.fishes fishes in-cone max.visibility viewangle
+  let eligible.fishes seen.fishes with [(xcor >= myxcor - (timed.transect.width / 2)) and (xcor <= myxcor + (timed.transect.width / 2))]  ; this only works for transects heading north, of course
+  let identifiable.fishes eligible.fishes with [visible.dist >= distance myself and visible?]
   let diver.memory memory
   let new.fishes identifiable.fishes with [not member? who diver.memory] ; only fishes that are not remembered are counted
-  if any? new.fishes [
-    let new.records ([species] of new.fishes)
+  ifelse count new.fishes > count.saturation [                       ; even if there are more, only the max number of fishes per second is counted (count.saturation)
+    let new.records ([species] of min-n-of count.saturation new.fishes [distance myself]) ; priority is given to closest fishes
     set counted.fishes sentence counted.fishes new.records
     set memory sentence memory [who] of new.fishes
-  ]
-end
-
-to t.forget.fishes          ; runs if super memory is off
-  let seen.fish.id [who] of fishes in-cone max.visibility timetransdiver.viewangle
-  let diver.memory memory
-  set memory filter [member? ? seen.fish.id] diver.memory
-end
-
-
-;Stationary diver procedures
-
-to do.stdiver.movement
-  set heading heading + (stationary.turning.angle / movement.time.step)            ; turns clockwise every second
-  
+  ] [
+  if any? new.fishes [                                      ; if there are new fishes, but they do not exceed count.saturation, just count them
+    let new.records ([species] of new.fishes) 
+    set counted.fishes sentence counted.fishes new.records
+    set memory sentence memory [who] of new.fishes
+  ]]
 end
 
 to s.count.fishes
-  let eligible.fishes fishes in-cone stationary.radius statdiver.viewangle
-  let identifiable.fishes eligible.fishes with [visible.dist <= distance myself and visible?]
+  let eligible.fishes fishes in-cone stationary.radius viewangle
+  let identifiable.fishes eligible.fishes with [visible.dist >= distance myself and visible?]
   let diver.memory memory
   let new.fishes identifiable.fishes with [not member? who diver.memory] ; only fishes that are not remembered are counted
-  if any? new.fishes [
-    let new.records ([species] of new.fishes)
+  ifelse count new.fishes > count.saturation [                       ; even if there are more, only the max number of fishes per second is counted (count.saturation)
+    let new.records ([species] of min-n-of count.saturation new.fishes [distance myself]) ; priority is given to closest fishes
     set counted.fishes sentence counted.fishes new.records
     set memory sentence memory [who] of new.fishes
-  ]
-end
-
-to s.forget.fishes          ; runs if super memory is off
-  let seen.fish.id [who] of fishes in-cone stationary.radius statdiver.viewangle
-  let diver.memory memory
-  set memory filter [member? ? seen.fish.id] diver.memory
-end
-
-;Roving diver procedures
-
-to do.rdiver.movement
-  if ticks mod 2 = 0 [set heading heading + random-float-between (- roving.diver.turning.angle) roving.diver.turning.angle]         ;turning happens every 2 seconds
-  fd speed / movement.time.step ; each step is a second, so the speed is basically the distance divided by the movement.time.step
+  ] [
+  if any? new.fishes [                                      ; if there are new fishes, but they do not exceed count.saturation, just count them
+    let new.records ([species] of new.fishes) 
+    set counted.fishes sentence counted.fishes new.records
+    set memory sentence memory [who] of new.fishes
+  ]]
 end
 
 to r.count.fishes
-  let eligible.fishes fishes in-cone max.visibility statdiver.viewangle
-  let identifiable.fishes eligible.fishes with [visible.dist <= distance myself and visible?]
+  let eligible.fishes fishes in-cone max.visibility viewangle
+  let identifiable.fishes eligible.fishes with [visible.dist >= distance myself and visible?]
   let diver.memory memory
   let new.fishes identifiable.fishes with [not member? who diver.memory] ; only fishes that were not previously counted are counted
-  if any? new.fishes [
-    let new.records ([species] of new.fishes)
+  ifelse count new.fishes > count.saturation [                       ; even if there are more, only the max number of fishes per second is counted (count.saturation)
+    let new.records ([species] of min-n-of count.saturation new.fishes [distance myself]) ; priority is given to closest fishes
     set counted.fishes sentence counted.fishes new.records
     set memory sentence memory [who] of new.fishes
-  ]
-    end
+  ] [
+  if any? new.fishes [                                      ; if there are new fishes, but they do not exceed count.saturation, just count them
+    let new.records ([species] of new.fishes) 
+    set counted.fishes sentence counted.fishes new.records
+    set memory sentence memory [who] of new.fishes
+  ]]
+end
 
-to r.forget.fishes          ; runs if super memory is off
-  let seen.fish.id [who] of fishes in-cone max.visibility statdiver.viewangle
+;forget fishes
+
+to forget.fishes                                                        ; runs if super memory is off
+  let seen.fish.id [who] of fishes in-cone max.visibility viewangle
   let diver.memory memory
   set memory filter [member? ? seen.fish.id] diver.memory
 end
 
 
-; useful reporters
+
+
+; USEFUL REPORTERS
 
 to-report random-bernoulli [probability-true]
   if probability-true < 0.0 or probability-true > 1.0 [user-message "WARNING: probability outside 0-1 range in random-bernoulli."]
@@ -933,6 +842,28 @@ end
 to-report occurrences [x the-list]             ; count the number of occurrences of an item in a list (useful for summarizing species lists)
   report reduce
     [ifelse-value (?2 = x) [?1 + 1] [?1]] (fput 0 the-list)
+end
+
+; OUTPUT REPORTERS (ONLY WORK FOR SINGLE SPECIES RUNS!)
+
+to-report real
+report total.density
+end
+
+to-report estimated
+report last first density.estimates  
+end
+
+to-report difference
+report estimated - real  
+end
+
+to-report instantaneous
+report last first snapshot.estimates  
+end
+
+to-report bias
+report last first bias.estimates  
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
@@ -960,7 +891,7 @@ GRAPHICS-WINDOW
 1
 1
 seconds
-5.0
+10.0
 
 BUTTON
 120
@@ -1033,7 +964,7 @@ timed.transect.diver.speed
 timed.transect.diver.speed
 1
 10
-10
+8
 1
 1
 m/min
@@ -1044,7 +975,7 @@ TEXTBOX
 40
 1190
 58
-Timed transect parameters
+Fixed time transect parameters
 11
 0.0
 1
@@ -1052,7 +983,7 @@ Timed transect parameters
 TEXTBOX
 1035
 290
-1185
+1235
 316
 Stationary point count parameters
 11
@@ -1076,14 +1007,14 @@ HORIZONTAL
 
 SLIDER
 1270
-120
+180
 1485
-153
+213
 max.visibility
 max.visibility
-5
+2
 40
-10
+7
 1
 1
 m
@@ -1098,7 +1029,7 @@ stationary.radius
 stationary.radius
 1
 20
-7.5
+5
 0.5
 1
 m
@@ -1119,7 +1050,7 @@ OUTPUT
 15
 390
 410
-500
+510
 11
 
 SLIDER
@@ -1140,9 +1071,9 @@ HORIZONTAL
 TEXTBOX
 1035
 415
-1155
-433
-Roving diver movement
+1255
+441
+Random path parameters
 11
 0.0
 1
@@ -1156,7 +1087,7 @@ roving.diver.turning.angle
 roving.diver.turning.angle
 0
 45
-4
+20
 1
 1
 º / 2 secs
@@ -1164,19 +1095,19 @@ HORIZONTAL
 
 TEXTBOX
 20
-545
-170
-563
-Select active sampling method
+560
+405
+578
+SELECT A SAMPLING METHOD________________________________________
 11
 0.0
 1
 
 SWITCH
 200
-305
+315
 410
-338
+348
 show.paths?
 show.paths?
 1
@@ -1185,9 +1116,9 @@ show.paths?
 
 SWITCH
 15
-305
+315
 200
-338
+348
 show.diver.detail.window?
 show.diver.detail.window?
 1
@@ -1196,10 +1127,10 @@ show.diver.detail.window?
 
 TEXTBOX
 20
-285
-95
-303
-Display options
+290
+400
+308
+DISPLAY OPTIONS________________________________________________
 11
 0.0
 1
@@ -1216,9 +1147,9 @@ Ability to remember all counted fishes (If turned off, divers forget fishes that
 
 BUTTON
 15
-500
+515
 410
-535
+550
 Clear output
 clear-output
 NIL
@@ -1233,9 +1164,9 @@ NIL
 
 BUTTON
 15
-665
+680
 295
-698
+713
 Reset perspective
 reset-perspective
 NIL
@@ -1272,7 +1203,7 @@ transect.distance
 transect.distance
 5
 100
-10
+40
 5
 1
 meters
@@ -1311,9 +1242,9 @@ HORIZONTAL
 TEXTBOX
 1035
 165
-1205
-183
-Distance transect parameters
+1235
+191
+Fixed distance transect parameters
 11
 0.0
 1
@@ -1368,9 +1299,9 @@ nr.species
 
 SLIDER
 1270
-185
+235
 1485
-218
+268
 behavior.change.interval
 behavior.change.interval
 1
@@ -1383,9 +1314,9 @@ HORIZONTAL
 
 TEXTBOX
 1270
-170
+220
 1470
-188
+238
 Time between behavior changes in fish.
 11
 0.0
@@ -1393,9 +1324,9 @@ Time between behavior changes in fish.
 
 BUTTON
 155
-615
+630
 295
-660
+675
 Focus on a random fish
 let chosen.one one-of fishes\nfollow chosen.one\ninspect chosen.one
 NIL
@@ -1409,9 +1340,9 @@ NIL
 1
 
 MONITOR
-310
+65
 25
-360
+115
 66
 NIL
 minutes
@@ -1420,9 +1351,9 @@ minutes
 10
 
 MONITOR
-260
+15
 25
-310
+65
 66
 NIL
 hours
@@ -1431,53 +1362,9 @@ hours
 10
 
 MONITOR
-210
+115
 25
-260
-66
-NIL
-day
-0
-1
-10
-
-MONITOR
-160
-25
-210
-66
-NIL
-month
-0
-1
-10
-
-MONITOR
-110
-25
-160
-66
-NIL
-season
-0
-1
-10
-
-MONITOR
-60
-25
-110
-66
-NIL
-year
-0
-1
-10
-
-MONITOR
-360
-25
-410
+165
 66
 NIL
 seconds
@@ -1487,12 +1374,12 @@ seconds
 
 SWITCH
 15
-340
+350
 200
-373
+383
 smooth.animation?
 smooth.animation?
-1
+0
 1
 -1000
 
@@ -1514,20 +1401,20 @@ NIL
 1
 
 TEXTBOX
-15
-10
-165
-28
-Model clock / calendar
+170
+30
+200
+60
+Model clock
 11
 0.0
 1
 
 TEXTBOX
 205
-345
+355
 335
-371
+381
 Disable smooth animation for faster model runs.
 11
 0.0
@@ -1605,9 +1492,9 @@ HORIZONTAL
 
 TEXTBOX
 85
-700
+715
 235
-726
+741
 (Stop following divers or fish)
 11
 0.0
@@ -1615,9 +1502,9 @@ TEXTBOX
 
 TEXTBOX
 1270
-100
+160
 1510
-118
+178
 Water visibility (Affects the divers' field of view)
 11
 0.0
@@ -1625,30 +1512,30 @@ Water visibility (Affects the divers' field of view)
 
 CHOOSER
 1270
-270
+350
 1485
-315
+395
 movement.time.step
 movement.time.step
 5 10
-0
+1
 
 TEXTBOX
 1270
-225
+290
 1505
-270
-Time step for each decision in the fish movement model. This must match the frame rate in model settings for normal speed to match real time.
+346
+Number of decisions per second in the fish movement model. This must match the frame rate in model settings for normal speed to match real time.
 11
 0.0
 1
 
 TEXTBOX
 1270
-320
+400
 1510
-375
-Please test behaviors in the species creator with the same frame rate. Different frame rates can lead to very different behaviors with the same parameters.
+456
+Please test behaviors in the species creator with the same number of decisions per second. Different values can lead to very different behaviors with the same parameters.
 11
 15.0
 1
@@ -1677,9 +1564,9 @@ Number
 
 TEXTBOX
 225
-235
+245
 380
-265
+275
 Select a fixed seed to generate similar consecutive model runs.
 11
 0.0
@@ -1687,19 +1574,19 @@ Select a fixed seed to generate similar consecutive model runs.
 
 CHOOSER
 15
-565
+580
 295
-610
+625
 sampling.method
 sampling.method
-"Fixed time transect" "Fixed distance transect" "Stationary point count" "Roving"
-1
+"Fixed time transect" "Fixed distance transect" "Stationary point count" "Random path"
+3
 
 BUTTON
 15
-615
+630
 155
-660
+675
 Follow diver
 follow one-of divers with [breed != buddies]
 NIL
@@ -1714,9 +1601,9 @@ NIL
 
 SWITCH
 300
-570
+585
 400
-603
+618
 buddy?
 buddy?
 0
@@ -1725,12 +1612,78 @@ buddy?
 
 TEXTBOX
 305
-610
+620
 395
-665
+675
 Buddy diver only assists main diver, but may affect fish responses.
 11
 0.0
+1
+
+TEXTBOX
+1294
+373
+1429
+399
+decisions per second
+11
+0.0
+1
+
+INPUTBOX
+210
+10
+310
+70
+override.density
+0
+1
+0
+Number
+
+TEXTBOX
+320
+20
+400
+65
+Set to 0 to use default density from file.
+11
+0.0
+1
+
+SLIDER
+1270
+90
+1485
+123
+count.saturation
+count.saturation
+1
+10
+3
+1
+1
+fish per second
+HORIZONTAL
+
+TEXTBOX
+1295
+125
+1460
+143
+(closest fishes are counted first)
+11
+0.0
+1
+
+TEXTBOX
+1040
+550
+1240
+590
+Scroll down to see the full map\n V
+15
+15.0
 1
 
 @#$#@#$#@
@@ -2223,6 +2176,496 @@ NetLogo 5.2.0
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
+<experiments>
+  <experiment name="3% monthly decline from 0.5, seasonal sampling, stationary" repetitions="10" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>real</metric>
+    <metric>estimated</metric>
+    <metric>difference</metric>
+    <metric>instantaneous</metric>
+    <metric>bias</metric>
+    <enumeratedValueSet variable="sampling.method">
+      <value value="&quot;Stationary point count&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="smooth.animation?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="super.memory?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="stationary.time">
+      <value value="2"/>
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="show.paths?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="movement.time.step">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="override.density">
+      <value value="0.5"/>
+      <value value="0.46"/>
+      <value value="0.42"/>
+      <value value="0.38"/>
+      <value value="0.35"/>
+      <value value="0.32"/>
+      <value value="0.29"/>
+      <value value="0.26"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="stationary.radius">
+      <value value="2.5"/>
+      <value value="3.6"/>
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="fixed.seed?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="stationary.turning.angle">
+      <value value="4"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="max.visibility">
+      <value value="7"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="behavior.change.interval">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="buddy?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="count.saturation">
+      <value value="3"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="3% monthly decline from 0.5, seasonal sampling, transect" repetitions="10" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>real</metric>
+    <metric>estimated</metric>
+    <metric>difference</metric>
+    <metric>instantaneous</metric>
+    <metric>bias</metric>
+    <enumeratedValueSet variable="sampling.method">
+      <value value="&quot;Fixed distance transect&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="smooth.animation?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="super.memory?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="transect.distance">
+      <value value="10"/>
+      <value value="20"/>
+      <value value="40"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="show.paths?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="movement.time.step">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="distance.transect.diver.speed">
+      <value value="4"/>
+      <value value="8"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="override.density">
+      <value value="0.5"/>
+      <value value="0.46"/>
+      <value value="0.42"/>
+      <value value="0.38"/>
+      <value value="0.35"/>
+      <value value="0.32"/>
+      <value value="0.29"/>
+      <value value="0.26"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="fixed.seed?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="distance.transect.width">
+      <value value="2"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="max.visibility">
+      <value value="7"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="behavior.change.interval">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="buddy?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="count.saturation">
+      <value value="3"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="3% monthly decline from 0.1, seasonal sampling, stationary" repetitions="10" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>real</metric>
+    <metric>estimated</metric>
+    <metric>difference</metric>
+    <metric>instantaneous</metric>
+    <metric>bias</metric>
+    <enumeratedValueSet variable="sampling.method">
+      <value value="&quot;Stationary point count&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="smooth.animation?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="super.memory?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="stationary.time">
+      <value value="2"/>
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="show.paths?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="movement.time.step">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="override.density">
+      <value value="0.1"/>
+      <value value="0.091"/>
+      <value value="0.083"/>
+      <value value="0.076"/>
+      <value value="0.069"/>
+      <value value="0.063"/>
+      <value value="0.058"/>
+      <value value="0.053"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="stationary.radius">
+      <value value="2.5"/>
+      <value value="3.6"/>
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="fixed.seed?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="stationary.turning.angle">
+      <value value="4"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="max.visibility">
+      <value value="7"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="behavior.change.interval">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="buddy?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="count.saturation">
+      <value value="3"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="3% monthly decline from 0.1, seasonal sampling, transect" repetitions="10" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>real</metric>
+    <metric>estimated</metric>
+    <metric>difference</metric>
+    <metric>instantaneous</metric>
+    <metric>bias</metric>
+    <enumeratedValueSet variable="sampling.method">
+      <value value="&quot;Fixed distance transect&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="smooth.animation?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="super.memory?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="transect.distance">
+      <value value="10"/>
+      <value value="20"/>
+      <value value="40"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="show.paths?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="movement.time.step">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="distance.transect.diver.speed">
+      <value value="4"/>
+      <value value="8"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="override.density">
+      <value value="0.1"/>
+      <value value="0.091"/>
+      <value value="0.083"/>
+      <value value="0.076"/>
+      <value value="0.069"/>
+      <value value="0.063"/>
+      <value value="0.058"/>
+      <value value="0.053"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="fixed.seed?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="distance.transect.width">
+      <value value="2"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="max.visibility">
+      <value value="7"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="behavior.change.interval">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="buddy?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="count.saturation">
+      <value value="3"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="5% monthly decline from 0.5, seasonal sampling, stationary" repetitions="10" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>real</metric>
+    <metric>estimated</metric>
+    <metric>difference</metric>
+    <metric>instantaneous</metric>
+    <metric>bias</metric>
+    <enumeratedValueSet variable="sampling.method">
+      <value value="&quot;Stationary point count&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="smooth.animation?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="super.memory?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="stationary.time">
+      <value value="2"/>
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="show.paths?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="movement.time.step">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="override.density">
+      <value value="0.5"/>
+      <value value="0.43"/>
+      <value value="0.37"/>
+      <value value="0.32"/>
+      <value value="0.27"/>
+      <value value="0.23"/>
+      <value value="0.2"/>
+      <value value="0.17"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="stationary.radius">
+      <value value="2.5"/>
+      <value value="3.6"/>
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="fixed.seed?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="stationary.turning.angle">
+      <value value="4"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="max.visibility">
+      <value value="7"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="behavior.change.interval">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="buddy?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="count.saturation">
+      <value value="3"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="5% monthly decline from 0.5, seasonal sampling, transect" repetitions="10" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>real</metric>
+    <metric>estimated</metric>
+    <metric>difference</metric>
+    <metric>instantaneous</metric>
+    <metric>bias</metric>
+    <enumeratedValueSet variable="sampling.method">
+      <value value="&quot;Fixed distance transect&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="smooth.animation?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="super.memory?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="transect.distance">
+      <value value="10"/>
+      <value value="20"/>
+      <value value="40"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="show.paths?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="movement.time.step">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="distance.transect.diver.speed">
+      <value value="4"/>
+      <value value="8"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="override.density">
+      <value value="0.5"/>
+      <value value="0.43"/>
+      <value value="0.37"/>
+      <value value="0.32"/>
+      <value value="0.27"/>
+      <value value="0.23"/>
+      <value value="0.2"/>
+      <value value="0.17"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="fixed.seed?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="distance.transect.width">
+      <value value="2"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="max.visibility">
+      <value value="7"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="behavior.change.interval">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="buddy?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="count.saturation">
+      <value value="3"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="5% monthly decline from 0.1, seasonal sampling, stationary" repetitions="10" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>real</metric>
+    <metric>estimated</metric>
+    <metric>difference</metric>
+    <metric>instantaneous</metric>
+    <metric>bias</metric>
+    <enumeratedValueSet variable="sampling.method">
+      <value value="&quot;Stationary point count&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="smooth.animation?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="super.memory?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="stationary.time">
+      <value value="2"/>
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="show.paths?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="movement.time.step">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="override.density">
+      <value value="0.1"/>
+      <value value="0.086"/>
+      <value value="0.074"/>
+      <value value="0.063"/>
+      <value value="0.054"/>
+      <value value="0.046"/>
+      <value value="0.04"/>
+      <value value="0.034"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="stationary.radius">
+      <value value="2.5"/>
+      <value value="3.6"/>
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="fixed.seed?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="stationary.turning.angle">
+      <value value="4"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="max.visibility">
+      <value value="7"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="behavior.change.interval">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="buddy?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="count.saturation">
+      <value value="3"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="5% monthly decline from 0.1, seasonal sampling, transect" repetitions="10" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>real</metric>
+    <metric>estimated</metric>
+    <metric>difference</metric>
+    <metric>instantaneous</metric>
+    <metric>bias</metric>
+    <enumeratedValueSet variable="sampling.method">
+      <value value="&quot;Fixed distance transect&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="smooth.animation?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="super.memory?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="transect.distance">
+      <value value="10"/>
+      <value value="20"/>
+      <value value="40"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="show.paths?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="movement.time.step">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="distance.transect.diver.speed">
+      <value value="4"/>
+      <value value="8"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="override.density">
+      <value value="0.1"/>
+      <value value="0.086"/>
+      <value value="0.074"/>
+      <value value="0.063"/>
+      <value value="0.054"/>
+      <value value="0.046"/>
+      <value value="0.04"/>
+      <value value="0.034"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="fixed.seed?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="distance.transect.width">
+      <value value="2"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="max.visibility">
+      <value value="7"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="behavior.change.interval">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="buddy?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="count.saturation">
+      <value value="3"/>
+    </enumeratedValueSet>
+  </experiment>
+</experiments>
 @#$#@#$#@
 @#$#@#$#@
 default

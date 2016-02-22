@@ -39,3 +39,12 @@ Option to use a fixed seed for the random number generator, so that the same mod
 World width and length resized for better performance
 Frame.rate renamed to behavior.time.step and set to 5ths of second
 Interface re-arranged
+
+1.0
+World width and length resized for better performance
+Frame.rate renamed to behavior.time.step and set to 5ths of second
+Interface re-arranged
+Divers are now a single breed
+max.velocity changed to max.sustained.speed
+burst.speed added
+behavior.time.step renamed movement.time.step and can be set to 10ths or 5ths of a second
