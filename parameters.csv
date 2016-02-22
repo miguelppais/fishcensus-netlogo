@@ -1,4 +1,0 @@
-Species,shape,size,color,density,detectability,visible_dist,approach_dist,B1_name,B1_frequency,B1_speed,B1_turn_angle,B2_name,B2_frequency,B2_speed,B2_turn_angle,B3_name,B3_frequency,B3_speed,B3_turn_angle,B4_name,B4_frequency,B4_speed,B4_turn_angle
-Piscis primus,fish rotate,0.3,15,0.1,1,6,2,stationary,0.4,0,180,cruising,0.2,0.5,25,feeding,0.4,0.2,270,n/a,0,0,0
-Piscis secondus,fish rotate,0.4,105,0.05,1,7,2,stationary,0.3,0,40,cruising,0.3,0.8,30,feeding,0.4,0.1,270,n/a,0,0,0
-Piscis tercius,fish rotate,0.5,7,0.01,1,8,2,stationary,0.1,0,0,cruising,0.5,1,20,feeding,0.4,0.5,270,n/a,0,0,0
