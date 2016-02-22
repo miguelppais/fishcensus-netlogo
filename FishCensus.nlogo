@@ -48,6 +48,8 @@ breed [statdivers statdiver] ;stationary point count diver
 
 breed [rovdivers rovdiver] ;roving diver     ; roving divers can't calculate densities accurately, yet they can estimate species richness and frequency of occurence.
 
+breed [buddies buddy]
+
 ;Agent variables
 
 fishes-own [                     ; fish variables
@@ -90,6 +92,7 @@ fishes-own [                     ; fish variables
 timetransdivers-own [            ; timed transect diver variables
   counted.fishes
   snapshot.fishes
+  density.estimates
   speed
   memory
   t.bias
@@ -99,6 +102,7 @@ timetransdivers-own [            ; timed transect diver variables
 distransdivers-own [             ; distance transect diver variables
   counted.fishes
   snapshot.fishes
+  density.estimates
   speed
   memory
   initial.ycor                   
@@ -111,6 +115,7 @@ distransdivers-own [             ; distance transect diver variables
 statdivers-own [                 ; stationary diver variables
   counted.fishes
   snapshot.fishes
+  density.estimates
   memory
   s.bias
   finished?
@@ -118,9 +123,15 @@ statdivers-own [                 ; stationary diver variables
 
 rovdivers-own [                  ; roving diver variables
   counted.fishes
+  counts.per.species
   speed
   memory
   finished?
+]
+
+buddies-own [
+  finished?                ; these variables are set for all members of "divers" agentset, so they must be buddy variables even if they are not used.
+  memory
 ]
 
 ;Interface procedures
@@ -237,9 +248,9 @@ to setup
   ask fishes [repeat movement.time.step * 20 [do.fish.movement]] ; lets the fish movement model stabilize for 20 ticks
   
   
-  output-print "Placing selected divers..."
+  output-print "Placing diver..."
   
-if timed.transect.diver? = true [                                         ;timed transect diver setup
+if sampling.method = "Fixed time transect" [                                         ;timed transect diver setup
   create-timetransdivers 1 [
  set heading 0
  set shape "diver"
@@ -249,10 +260,21 @@ if timed.transect.diver? = true [                                         ;timed
  if show.paths? = true [pen-down]                                                           ;this shows the path of the diver
  set speed timed.transect.diver.mean.speed
  set counted.fishes [] ; sets counted.fishes as an empty list
-]
+ set density.estimates [] ; sets density.estimates as an empty list
+ set snapshot.fishes ([species] of (fishes with [(xcor >= (world-width / 2) - timed.transect.width) and (xcor <= (world-width / 2) + timed.transect.width) and (ycor >= (world-height / 4)) and (ycor <= ((world-height / 4) + (transect.time * timed.transect.diver.speed)))]))
+  ]
+  if buddy? [
+   create-buddies 1 [
+    set heading 0
+    set shape "diver"
+    set color cyan
+    set size 2
+    setxy ([xcor] of one-of timetransdivers + 1) ([ycor] of one-of timetransdivers - 1) 
+   ] 
+  ]
 ]
 
-if distance.transect.diver? = true [                                         ;distance transect diver setup
+if sampling.method = "Fixed distance transect" [                                         ;distance transect diver setup
   create-distransdivers 1 [
  set heading 0
  set shape "diver"
@@ -264,10 +286,21 @@ if distance.transect.diver? = true [                                         ;di
  set initial.ycor ycor                                                              ; fixed distance transect divers record their start and end points as given by "transect.distance" initially
  set final.ycor ycor + transect.distance                                            ; because coordinates are in meters
  set counted.fishes [] ; sets counted.fishes as an empty list
-]
+ set density.estimates [] ; sets density.estimates as an empty list
+ set snapshot.fishes ([species] of (fishes with [(xcor >= (world-width / 2) - distance.transect.width) and (xcor <= (world-width / 2) + distance.transect.width) and (ycor >= (world-height / 4)) and (ycor <= ((world-height / 4) + (transect.distance)))]))
+  ]
+  if buddy? [
+   create-buddies 1 [
+    set heading 0
+    set shape "diver"
+    set color green
+    set size 2
+    setxy ([xcor] of one-of distransdivers + 1) ([ycor] of one-of distransdivers - 1) 
+   ] 
+  ]
 ]
 
-if stationary.diver? = true [                                               ;stationary diver setup
+if sampling.method = "Stationary point count" [                                               ;stationary diver setup
   create-statdivers 1 [
  set heading 0
  set shape "diver"
@@ -275,10 +308,21 @@ if stationary.diver? = true [                                               ;sta
  set size 2
  setxy (world-width / 2) (world-height / 4)
  set counted.fishes [] ; sets counted.fishes as an empty list
+ set density.estimates [] ; sets density.estimates as an empty list
+ set snapshot.fishes ([species] of (fishes in-radius stationary.radius))
 ]
+  if buddy? [
+   create-buddies 1 [
+    set heading 0
+    set shape "diver"
+    set color red
+    set size 2
+    setxy ([xcor] of one-of statdivers + 1) ([ycor] of one-of statdivers - 1) 
+   ] 
+  ]
 ]
 
-if roving.diver? = true [                                                      ;roving diver setup
+if sampling.method = "Roving" [                                                      ;roving diver setup
   create-rovdivers 1 [
  set heading 0
  set shape "diver"
@@ -288,10 +332,20 @@ if roving.diver? = true [                                                      ;
  if show.paths? = true [pen-down]                                                           ;this shows the path of the diver
  set speed roving.diver.mean.speed
  set counted.fishes [] ; sets counted.fishes as an empty list
+ set counts.per.species []  ; sets counts.per.species as an empty list
 ]
+  if buddy? [
+   create-buddies 1 [
+    set heading 0
+    set shape "diver"
+    set color magenta
+    set size 2
+    setxy ([xcor] of one-of rovdivers + 1) ([ycor] of one-of rovdivers - 1) 
+   ] 
+  ]
 ]
 
-set divers (turtle-set timetransdivers distransdivers statdivers rovdivers) ; creates the agentset containing all divers (all methods)
+set divers (turtle-set timetransdivers distransdivers statdivers rovdivers buddies) ; creates the agentset containing all divers (all methods)
 
 ask divers [                                                    
  set finished? false                                            ; reset the "finished?" variable
@@ -299,8 +353,12 @@ ask divers [
 ]
 
 output-print "Setup complete. Press GO to run the model"
+
 reset-ticks
-if show.diver.detail.windows? = true [
+
+; open diver detail window
+
+if show.diver.detail.window? = true [
   if any? timetransdivers [inspect one-of timetransdivers]         ; need to use "if any?" because inspect will return an error if it finds nobody
   if any? distransdivers [inspect one-of distransdivers]
   if any? statdivers [inspect one-of statdivers]
@@ -312,7 +370,7 @@ end ;of setup procedure
 to go
   if count divers = count divers with [finished?] [             
     do.outputs
-    stop]                                   
+    stop]                                  
   if stationary.radius > max.visibility [
    output-print "ERROR: stationary.radius is set to a value greater than max.visibility"              ; if the stationary radius is higher than visibility, stop and output an error description
    output-print "The diver will not be able to see the sample area"
@@ -323,7 +381,7 @@ to go
   
   ask timetransdivers [                                                                  ; divers count the fishes, unless they are finished
    if not finished? [t.count.fishes]
-  ]
+   ]
 
   ask distransdivers [
    if not finished? [d.count.fishes] 
@@ -344,6 +402,7 @@ to go
     ifelse ticks > transect.time.secs [                           ; if their end of sampling conditions are met, set variable "finished?" to "true" and stop moving
      set finished? true 
      set label "finished"
+     if any? buddies [ask buddies [set finished? true]]
     ] [
     do.tdiver.movement
     ]
@@ -353,6 +412,7 @@ to go
     ifelse ycor > final.ycor [
      set finished? true 
      set label "finished"
+     if any? buddies [ask buddies [set finished? true]]
     ] [
     do.ddiver.movement
     ]
@@ -362,6 +422,7 @@ to go
     ifelse ticks > stationary.time.secs [
      set finished? true
      set label "finished"
+     if any? buddies [ask buddies [set finished? true]]
     ] [
     do.stdiver.movement
     ]
@@ -371,9 +432,15 @@ to go
     ifelse ticks > roving.time.secs [
      set finished? true 
      set label "finished"
+     if any? buddies [ask buddies [set finished? true]]
     ] [
     do.rdiver.movement
     ]
+  ]
+  
+  ask buddies [                                                                           ; move the buddies
+   set heading [heading] of one-of other divers
+   setxy ([xcor] of one-of other divers + 1) ([ycor] of one-of other divers - 1) 
   ]
 
   ask fishes [                                                      ; move the fishes                                                     
@@ -417,36 +484,67 @@ end
 
 
 
-;Observer procedures
+;OBSERVER PROCEDURES
 
 to do.outputs
   ask timetransdivers [
     let real.count length counted.fishes
-    let expected.count total.density * timed.transect.area
+    let expected.count length snapshot.fishes
     set t.bias (real.count - expected.count) / expected.count
-    output-type "Timed transect diver bias was " output-print precision t.bias 2            ; outputs bias with 2 decimal places
+    output-print word "Timed transect diver bias was " precision t.bias 2            ; outputs bias with 2 decimal places
+    output-print "Density estimates:"
+    foreach n-values nr.species [? + 1] [
+    let sp.param item ? species.data
+    let name item 0 sp.param
+    let sp.dens.pair list name (occurrences name counted.fishes / timed.transect.area)
+    set density.estimates lput sp.dens.pair density.estimates
+    output-print (word first sp.dens.pair ": " last sp.dens.pair)
+    ]
   ]
   
   ask distransdivers [
     let real.count length counted.fishes
-    let expected.count total.density * distance.transect.area
+    let expected.count length snapshot.fishes
     set d.bias (real.count - expected.count) / expected.count
-    output-type "Distance transect diver bias was " output-print precision d.bias 2         ; outputs bias with 2 decimal places
+    output-print word "Distance transect diver bias was " precision d.bias 2         ; outputs bias with 2 decimal places
+    output-print "Density estimates:"
+    foreach n-values nr.species [? + 1] [
+    let sp.param item ? species.data
+    let name item 0 sp.param
+    let sp.dens.pair list name (occurrences name counted.fishes / distance.transect.area)
+    set density.estimates lput sp.dens.pair density.estimates
+    output-print (word first sp.dens.pair ": " last sp.dens.pair)
+    ]
   ]
   
  ask statdivers [
     let real.count length counted.fishes
-    let expected.count total.density * stationary.area
+    let expected.count length snapshot.fishes
     set s.bias (real.count - expected.count) / expected.count
-    output-type "Stationary diver bias was " output-print precision s.bias 2                ; outputs bias with 2 decimal places
+    output-print word "Stationary diver bias was " precision s.bias 2                ; outputs bias with 2 decimal places
+    output-print "Density estimates:"
+    foreach n-values nr.species [? + 1] [
+    let sp.param item ? species.data
+    let name item 0 sp.param
+    let sp.dens.pair list name (occurrences name counted.fishes / stationary.area)  
+    set density.estimates lput sp.dens.pair density.estimates
+    output-print (word first sp.dens.pair ": " last sp.dens.pair)
+    ]
  ]
  
  ask rovdivers [
     let real.count length counted.fishes
-    output-type "Roving diver swam " output-type roving.time.secs * roving.diver.mean.speed output-type "m and counted " output-type real.count output-print " fishes"                     ; the roving diver only tells how many fishes it counted
+    output-type "Roving diver swam " output-type roving.time.secs * roving.diver.mean.speed output-type "m and counted " output-type real.count output-print " fishes"                    ; the roving diver only tells how many fishes it counted
+    output-print "Counts per species:"
+    foreach n-values nr.species [? + 1] [
+    let sp.param item ? species.data
+    let name item 0 sp.param
+    let count.pair list name (occurrences name counted.fishes)  
+    set counts.per.species lput count.pair counts.per.species
+    output-print (word first count.pair ": " last count.pair)
+    ]    
  ]
 end
-
 
 
 ;FISH PROCEDURES
@@ -824,7 +922,7 @@ end
 ; useful reporters
 
 to-report random-bernoulli [probability-true]
-  if probability-true < 0.0 or probability-true > 1.0 [user-message "WARNING: probability outside 0-1 range in random-bernoulli reporter."]
+  if probability-true < 0.0 or probability-true > 1.0 [user-message "WARNING: probability outside 0-1 range in random-bernoulli."]
   report random-float 1.0 < probability-true
 end
 
@@ -935,7 +1033,7 @@ timed.transect.diver.speed
 timed.transect.diver.speed
 1
 10
-8
+10
 1
 1
 m/min
@@ -946,7 +1044,7 @@ TEXTBOX
 40
 1190
 58
-Timed transect diver movement
+Timed transect parameters
 11
 0.0
 1
@@ -955,8 +1053,8 @@ TEXTBOX
 1035
 290
 1185
-308
-Stationary diver movement
+316
+Stationary point count parameters
 11
 0.0
 1
@@ -1064,45 +1162,12 @@ roving.diver.turning.angle
 º / 2 secs
 HORIZONTAL
 
-SWITCH
-15
-565
-190
-598
-timed.transect.diver?
-timed.transect.diver?
-1
-1
--1000
-
-SWITCH
-15
-635
-190
-668
-stationary.diver?
-stationary.diver?
-1
-1
--1000
-
-SWITCH
-15
-670
-190
-703
-roving.diver?
-roving.diver?
-1
-1
--1000
-
 TEXTBOX
 20
 545
 170
 563
-Select active sampling methods
+Select active sampling method
 11
 0.0
 1
@@ -1121,10 +1186,10 @@ show.paths?
 SWITCH
 15
 305
-201
+200
 338
-show.diver.detail.windows?
-show.diver.detail.windows?
+show.diver.detail.window?
+show.diver.detail.window?
 1
 1
 -1000
@@ -1167,91 +1232,12 @@ NIL
 1
 
 BUTTON
-190
-565
-255
-598
-Follow
-if any? timetransdivers [follow one-of timetransdivers]
-NIL
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
-
-BUTTON
-190
-635
-255
-668
-Follow
-if any? statdivers [follow one-of statdivers]
-NIL
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
-
-BUTTON
-190
-670
-255
-703
-Follow
-if any? rovdivers [follow one-of rovdivers]
-NIL
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
-
-BUTTON
 15
-705
-255
-738
+665
+295
+698
 Reset perspective
 reset-perspective
-NIL
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
-
-SWITCH
-15
-600
-190
-633
-distance.transect.diver?
-distance.transect.diver?
-0
-1
--1000
-
-BUTTON
-190
-600
-255
-633
-Follow
-follow one-of distransdivers
 NIL
 1
 T
@@ -1327,7 +1313,7 @@ TEXTBOX
 165
 1205
 183
-Distance transect diver movement
+Distance transect parameters
 11
 0.0
 1
@@ -1406,10 +1392,10 @@ Time between behavior changes in fish.
 1
 
 BUTTON
-270
-600
-400
-670
+155
+615
+295
+660
 Focus on a random fish
 let chosen.one one-of fishes\nfollow chosen.one\ninspect chosen.one
 NIL
@@ -1582,7 +1568,7 @@ TEXTBOX
 15
 1250
 33
-DIVER MOVEMENT____________________
+SAMPLING METHODS__________________
 11
 0.0
 1
@@ -1618,10 +1604,10 @@ m
 HORIZONTAL
 
 TEXTBOX
-65
-740
-215
-766
+85
+700
+235
+726
 (Stop following divers or fish)
 11
 0.0
@@ -1695,6 +1681,54 @@ TEXTBOX
 380
 265
 Select a fixed seed to generate similar consecutive model runs.
+11
+0.0
+1
+
+CHOOSER
+15
+565
+295
+610
+sampling.method
+sampling.method
+"Fixed time transect" "Fixed distance transect" "Stationary point count" "Roving"
+1
+
+BUTTON
+15
+615
+155
+660
+Follow diver
+follow one-of divers with [breed != buddies]
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+SWITCH
+300
+570
+400
+603
+buddy?
+buddy?
+0
+1
+-1000
+
+TEXTBOX
+305
+610
+395
+665
+Buddy diver only assists main diver, but may affect fish responses.
 11
 0.0
 1

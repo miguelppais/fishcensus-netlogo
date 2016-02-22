@@ -34,3 +34,8 @@ World now displays a grid of 1m^2 squares for scale
 visible.dist implemented as a fish attribute. Divers only count fish if they are within their visible distance
 Fish in a school set behaviors collectively
 Option to use a fixed seed for the random number generator, so that the same model outcome can be produced consecutively
+
+0.8
+World width and length resized for better performance
+Frame.rate renamed to behavior.time.step and set to 5ths of second
+Interface re-arranged
