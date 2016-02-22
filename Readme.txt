@@ -3,6 +3,7 @@ Changelog
 
 1.2
 Visibility is now established with behavior change (based on detectability), instead of every second.
+No need for bernoulli trial if detectability is 1 (optimization)
 
 1.1
 Fixed some fish not choosing a patch when patch.gathering.w > 0

@@ -195,7 +195,7 @@ to setup
         sublist sp.param 66 82)
       set visible? true
       set behavior.set? false
-      set.behavior                          ; fish procedure that draws the starting behavior from the list and fills in parameters
+      set.behavior                          ; fish procedure that draws the starting behavior from the list and fills in parameters (this resets "visible?" depending on picked behavior)
     ]
   ]
   set total.density (count fishes / world.area) ; this takes into account the actual number of fishes in the area, and not the original input number.
@@ -553,7 +553,11 @@ to set.behavior                                                        ; fish pr
     set predator.avoidance.w item 13 params
     set prey.chasing.w item 14 params
     set diver.avoidance.w item 15 params
-    if detectability < 1 [set visible? random-bernoulli detectability]    ; visibility of individual fish is set when behavior changes, using a Bernoulli trial
+    ifelse detectability < 1 [
+      set visible? random-bernoulli detectability    ; visibility of individual fish is set when behavior changes, using a Bernoulli trial
+      ] [
+      set visible? true
+      ]
     set behavior.set? true
     if any? schoolmates [
       ask schoolmates [
@@ -572,7 +576,11 @@ to set.behavior                                                        ; fish pr
         set predator.avoidance.w item 13 params
         set prey.chasing.w item 14 params
         set diver.avoidance.w item 15 params
-        if detectability < 1 [set visible? random-bernoulli detectability]
+        ifelse detectability < 1 [
+          set visible? random-bernoulli detectability    ; visibility of schoolmates is set independently
+          ] [
+          set visible? true
+          ]
         set behavior.set? true
       ]
     ]
@@ -1159,7 +1167,7 @@ transect.distance
 transect.distance
 5
 100
-20
+40
 5
 1
 meters
@@ -1519,7 +1527,7 @@ CHOOSER
 sampling.method
 sampling.method
 "Fixed time transect" "Fixed distance transect" "Stationary point count" "Random path"
-2
+1
 
 BUTTON
 15
@@ -1575,7 +1583,7 @@ INPUTBOX
 310
 70
 override.density
-0.2
+0.3
 1
 0
 Number
@@ -1641,7 +1649,7 @@ INPUTBOX
 135
 220
 file.name
-not cryptic
+cryptic 3
 1
 0
 String
