@@ -21,3 +21,16 @@ approach.dist is a new fish variable. Fish move away from the diver if this dist
 visible.dist is now a property of fish species. Global variable changed to max.visibility
 New memory algorithm: super memory makes divers remember all fish, if turned off, divers forget fish that leave the FOV
 
+0.7
+Previous movement algorithm did not meet requirements and was removed
+Entirely new movement algorithm based on vectors and urges
+Fish can gather around an area or even stop completely
+Schools pick patches collectively
+Schooling is now available
+Movement time step can be changed to balance performance and accuracy
+Separate model called "species creator" is used to observe the species behaviors and export species parameters to a csv file
+Fish can be predators and chase other fish, that will respond with avoidance behavior
+World now displays a grid of 1m^2 squares for scale
+visible.dist implemented as a fish attribute. Divers only count fish if they are within their visible distance
+Fish in a school set behaviors collectively
+Option to use a fixed seed for the random number generator, so that the same model outcome can be produced consecutively

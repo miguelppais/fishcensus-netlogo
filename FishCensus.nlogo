@@ -3,10 +3,10 @@ extensions [
   rnd              ; used by fishes to calculate next behavior with a weighted random pick
   ]          
 
-;Global variables not represented in the main screen
+;Global variables not represented on the interface tab
 
 globals[
-  actual.area
+  world.area
   file.name                 ; species parameters input csv file name
   species.data              ; imported input data from the csv file
   file.delimiter            ; delimiter for the csv file (user prompt)
@@ -26,7 +26,14 @@ globals[
   timed.transect.area
   distance.transect.area
   stationary.area
-  divers ; an agentset with all active divers
+  divers                    ; an agentset with all active divers
+  year                      ; variables for the model clock
+  season
+  month
+  day
+  hours
+  minutes
+  seconds
 ]
 
 ;Agent types
@@ -44,20 +51,45 @@ breed [rovdivers rovdiver] ;roving diver     ; roving divers can't calculate den
 ;Agent variables
 
 fishes-own [                     ; fish variables
-  current.behavior
-  speed
-  turning.angle
-  species
-  detectability                  
-  visible.dist
-  approach.dist
-  behavior.list
-  behavior.freqs
-  behavior.params                ; a list of lists with speed and turning angle per behavior
+  drag.formula                   ; the coefficient used to calculate drag, given speed and fish size
+  current.behavior               ; picked from behavior.list
+  behavior.set?                  ; boolean that tells if fish has set its behavior this turn
+  schoolmates                    ; for schooling species, agentset of nearby fishes
+  nearest-neighbor               ; closest schoolmate
+  velocity                       ; vector with x and y components determined by the previous velocity and the current acceleration at each step
+  acceleration                   ; vector with x and y components, determined by the sum of all urges
+  species                        ; this separates the different types within the fish breed. This is the variable recorded by divers while counting
+  prey.type                      ; "benthic" or "fish". Defines the type of feeding behavior (gather around a patch or chase prey)
+  detectability                  ; probability of being missed (if = 1 fish is always counted if within visible.dist)
+  visible?                       ; boolean variable that is set by detectability every second                  
+  visible.dist                   ; maximum distance from diver required to correctly identify the species
+  approach.dist                  ; minimum distance from diver that the fish tolerate
+  behavior.list                  ; list of up to 4 distinct behaviors
+  behavior.freqs                 ; frequency of each behavior
+  behavior.params                ; a list of lists with constants for the movement model per behavior
+  picked.patch                   ; patch picked by the school to feed on (if prey is benthic)
+  picked.patch.dist              ; maximum distance from the feeding patch
+  patch.gathering.w              ; weighs the urge to gather at a feeding patch
+  perception.dist                ; fish perception distance
+  perception.angle               ; fish perception angle (360 for full directional awareness)
+  max.velocity                   ; maximum attainable velocity
+  max.acceleration               ; maximum attainable acceleration
+  diver.avoidance.w              ; weighs the urge to avoid divers. If negative, fish are attracted to divers
+  predator.avoidance.w           ; weighs the urge to avoid fish with prey.type = "fish"
+  obstacle.avoidance.w           ; weighs the urge to avoid obstacles (brown patches)
+  prey.chasing.w                 ; weighs the urge to chase other fish
+  cruise.distance                ; distance among schoolmates in a school (in body lengths)
+  align.w                        ; weighs the urge to match school direction
+  center.w                       ; weighs the urge to stand between nearby schoolmates
+  spacing.w                      ; weighs the urge to maintain crusing.distance from schoolmates
+  wander.w                       ; weighs the urge to wander around randomly
+  rest.w                         ; weighs the urge to stop and rest
+  schooling?                     ; boolean variable that determines if fish exhibit schooling behavior
 ]
 
 timetransdivers-own [            ; timed transect diver variables
   counted.fishes
+  snapshot.fishes
   speed
   memory
   t.bias
@@ -66,6 +98,7 @@ timetransdivers-own [            ; timed transect diver variables
 
 distransdivers-own [             ; distance transect diver variables
   counted.fishes
+  snapshot.fishes
   speed
   memory
   initial.ycor                   
@@ -77,6 +110,7 @@ distransdivers-own [             ; distance transect diver variables
 
 statdivers-own [                 ; stationary diver variables
   counted.fishes
+  snapshot.fishes
   memory
   s.bias
   finished?
@@ -89,14 +123,48 @@ rovdivers-own [                  ; roving diver variables
   finished?
 ]
 
-;Setup and go procedures
+;Interface procedures
+
+to import-dataset       ; imports species data from a .csv file to global variable species.data
+  output-print "Importing species data..."
+  set file.name (word user-input "Name of the .csv file with species parameters? (exclude extension)" ".csv")
+  set file.delimiter user-input "Delimiter symbol in the .csv file? (usually , or ;)"               ; a window prompts for the csv file delimiter
+  carefully [set species.data (csv:from-file file.name file.delimiter)                                         ; import csv file into a list of lists
+  if length species.data < 2 [user-message "ERROR: input file has only 1 row or is empty. Check if input file has a header plus 1 line per species." stop] ; ERROR MESSAGE
+  let delimiter.check item 0 species.data
+  if length delimiter.check = 1 [user-message "ERROR: unable to separate parameters in the file. Probably wrong delimiter picked." stop] ; ERROR MESSAGE
+  set nr.species length species.data - 1                                                            ; all filled lines minus the header
+  ifelse user-yes-or-no? (word "Detected " nr.species " species. Is this correct?") [
+    user-message "Species data imported. Press setup."
+    output-print "Data successfully loaded."] [                                                     ; confirm number of species in the file
+  user-message "Check if input file has a header plus 1 line per species."                          ; ERROR MESSAGE
+  output-print "Number of species incorrectly identified. Check file."
+  stop]]
+  [user-message (word "File " file.name " not found in model folder.") stop]
+end
 
 to setup
-  ca
+  if species.data = 0 [user-message "You need to import a dataset first. Import the example.csv file or create one using the species creator." stop] ; ERROR MESSAGE
+  if fixed.seed? [random-seed seed]
+  clear-ticks                                          ; reset model clock and clear everything except global variables (or else it would erase species.data and nr.species)
+  set year 1
+  set season 1
+  set month 1
+  set day 1
+  set hours 0
+  set minutes 0
+  set seconds 0
+  clear-turtles
+  clear-patches
+  clear-drawing
+  clear-all-plots
   stop-inspecting-dead-agents                           ; clears diver detail windows from previous simulation runs
-  ask patches [set pcolor 102]
+  output-print "Drawing display grid..."
+  ask patches with [pycor mod 2 = 0 and pxcor mod 2 = 0] [set pcolor 103]
+  ask patches with [pycor mod 2 = 1 and pxcor mod 2 = 1] [set pcolor 103]
+  ask patches with [pcolor = black] [set pcolor 105]
   output-print "Calculating global constants..."
-  set actual.area world-height * world-width
+  set world.area world-height * world-width
   set timetransdiver.viewangle 180                      ; sets viewangles for all divers
   set distransdiver.viewangle 180
   set statdiver.viewangle 160
@@ -107,9 +175,10 @@ to setup
   set timed.transect.diver.mean.speed (timed.transect.diver.speed / 60)  ; these lines just convert interface speeds (in m/min) to m/s
   set distance.transect.diver.mean.speed (distance.transect.diver.speed / 60)
   set roving.diver.mean.speed (roving.diver.speed / 60)
+  set divers no-turtles                                                  ; resets the "divers" agentset (otherwise it would be set to 0 and generate errors during setup)
   
-; THIS SHOULD TAKE INTO ACCOUNT THE ARC IN THE END (replace "timed.transect.width * max.visibility")
-  
+; for the timed transect, the sampled area is distance * width plus max visibility * width at the end (an approximation that ignores the fact that visibility is the radius of a circle).
+
   set timed.transect.area timed.transect.width * (timed.transect.diver.mean.speed * transect.time.secs) + (timed.transect.width * max.visibility)
   
 ; for the distance transect, the sampled area is only distance * width
@@ -119,55 +188,64 @@ to setup
 ; for the stationary diver, it is the area of the circle around the diver
   
   set stationary.area pi * stationary.radius ^ 2
-
-; input species details from a csv file
+ 
+; read the information stored in species.data to place fishes 
   
-  output-print "Importing species data..."
-  set file.name (word user-input "Name of the .csv file with species parameters? (exclude extension)" ".csv")
-  set file.delimiter user-input "Delimiter symbol in the .csv file? (usually , or ;)"               ; a window prompts for the csv file delimiter
-  set species.data (csv:from-file file.name file.delimiter)                                         ; import csv file into a list of lists
-  set nr.species length species.data - 1                                                            ; all filled lines minus the header
-  if not user-yes-or-no? (word "Detected " nr.species " species. Is this correct?") [               ; confirm number of species in the file
-  user-message "Check if input file has a header plus 1 line per species."                          ; error message if number is not correct
-  stop
-  ]
   output-print "Placing fishes..."
-  foreach n-values nr.species [? + 1] [                                                       ; loop that creates fish for each species and sets all fish variables
+  foreach n-values nr.species [? + 1] [           ; loop that creates fish for each species and sets all fish variables
     let sp.param item ? species.data
     let sp.density item 4 sp.param
-    create-fishes (sp.density * actual.area) [
+    create-fishes (sp.density * world.area) [
       setxy random-xcor random-ycor
+      set velocity [0 0]
+      set acceleration [0 0]
+      set picked.patch false
+      set schoolmates no-turtles                  ; sets schoolmates as an empty agentset
+      set nearest-neighbor nobody
       set species item 0 sp.param
+      if length sp.param != 76 [user-message (word "ERROR: species number " ? " '" species "' has a parameter list that is incomplete or too long. Check file.") stop] ; ERROR MESSAGE
       set shape item 1 sp.param
       set size item 2 sp.param
+      set drag.formula (-11297 / (20600 * (size ^ 0.8571))) ; if size is fixed, this can be fixed too.
       set color item 3 sp.param
-      set detectability item 5 sp.param
-      set visible.dist item 6 sp.param
-      set approach.dist item 7 sp.param
-      set behavior.list (list item 8 sp.param item 12 sp.param item 16 sp.param item 20 sp.param)
-      set behavior.freqs (list item 9 sp.param item 13 sp.param item 17 sp.param item 21 sp.param)
+      set visible.dist item 5 sp.param
+      set approach.dist item 6 sp.param
+      set perception.dist item 7 sp.param
+      set perception.angle item 8 sp.param
+      set prey.type item 9 sp.param
+      set max.acceleration item 10 sp.param
+      set max.velocity item 11 sp.param
+      set behavior.list (list item 12 sp.param item 28 sp.param item 44 sp.param item 60 sp.param)
+      set behavior.freqs (list item 13 sp.param item 29 sp.param item 45 sp.param item 61 sp.param)
       if reduce + behavior.freqs != 1 [
-       user-message (word "ERROR! Behavior frequencies for " species " do not add up to 1.")
-       stop
-      ]
-      set behavior.params (list list item 10 sp.param item 11 sp.param list item 14 sp.param item 15 sp.param list item 18 sp.param item 19 sp.param list item 22 sp.param item 23 sp.param)
-      
-      set.behavior                          ; fish procedure that draws the first behavior from the list and fills in speed and turning angle
+       user-message (word "ERROR! Behavior frequencies for " species " do not add up to 1.") stop]   ; ERROR MESSAGE
+      set behavior.params (list                                ; lists parameter values for all 4 behaviors
+        sublist sp.param 12 28
+        sublist sp.param 28 44
+        sublist sp.param 44 60
+        sublist sp.param 60 76)
+      set visible? true
+      set behavior.set? false
+      set.behavior                          ; fish procedure that draws the starting behavior from the list and fills in parameters
     ]
   ]
-  set total.density (count fishes / actual.area)
+  set total.density (count fishes / world.area)
   set numb.fishes count fishes
   output-print (word "Imported " count fishes " fishes belonging to " nr.species " species,")
   output-print (word "with a total density of " total.density " fish per square meter.")
-  output-print "Placing divers..."
+  output-print "Stabilizing fish movement model..."
+  ask fishes [repeat movement.time.step * 20 [do.fish.movement]] ; lets the fish movement model stabilize for 20 ticks
+  
+  
+  output-print "Placing selected divers..."
   
 if timed.transect.diver? = true [                                         ;timed transect diver setup
   create-timetransdivers 1 [
  set heading 0
- set shape "person rotate"
- set color blue
+ set shape "diver"
+ set color cyan
  set size 2
- setxy (world-width / 2) (world-height / 3)
+ setxy (world-width / 2) (world-height / 4)
  if show.paths? = true [pen-down]                                                           ;this shows the path of the diver
  set speed timed.transect.diver.mean.speed
  set counted.fishes [] ; sets counted.fishes as an empty list
@@ -177,10 +255,10 @@ if timed.transect.diver? = true [                                         ;timed
 if distance.transect.diver? = true [                                         ;distance transect diver setup
   create-distransdivers 1 [
  set heading 0
- set shape "person rotate"
+ set shape "diver"
  set color green
  set size 2
- setxy (world-width / 2) (world-height / 3)
+ setxy (world-width / 2) (world-height / 4)
  if show.paths? = true [pen-down]                                                           ;this shows the path of the diver
  set speed distance.transect.diver.mean.speed
  set initial.ycor ycor                                                              ; fixed distance transect divers record their start and end points as given by "transect.distance" initially
@@ -192,10 +270,10 @@ if distance.transect.diver? = true [                                         ;di
 if stationary.diver? = true [                                               ;stationary diver setup
   create-statdivers 1 [
  set heading 0
- set shape "person rotate"
+ set shape "diver"
  set color red
  set size 2
- setxy (world-width / 2) (world-height / 3)
+ setxy (world-width / 2) (world-height / 4)
  set counted.fishes [] ; sets counted.fishes as an empty list
 ]
 ]
@@ -203,10 +281,10 @@ if stationary.diver? = true [                                               ;sta
 if roving.diver? = true [                                                      ;roving diver setup
   create-rovdivers 1 [
  set heading 0
- set shape "person rotate"
- set color yellow
+ set shape "diver"
+ set color magenta
  set size 2
- setxy (world-width / 2) (world-height / 3)
+ setxy (world-width / 2) (world-height / 4)
  if show.paths? = true [pen-down]                                                           ;this shows the path of the diver
  set speed roving.diver.mean.speed
  set counted.fishes [] ; sets counted.fishes as an empty list
@@ -223,7 +301,7 @@ ask divers [
 output-print "Setup complete. Press GO to run the model"
 reset-ticks
 if show.diver.detail.windows? = true [
-  if any? timetransdivers [inspect one-of timetransdivers]         ; here I had to use "if any?" because inspect will return an error if it finds nobody
+  if any? timetransdivers [inspect one-of timetransdivers]         ; need to use "if any?" because inspect will return an error if it finds nobody
   if any? distransdivers [inspect one-of distransdivers]
   if any? statdivers [inspect one-of statdivers]
   if any? rovdivers [inspect one-of rovdivers]
@@ -232,16 +310,36 @@ end ;of setup procedure
 
 
 to go
-  tick
   if count divers = count divers with [finished?] [             
     do.outputs
     stop]                                   
   if stationary.radius > max.visibility [
    output-print "ERROR: stationary.radius is set to a value greater than max.visibility"              ; if the stationary radius is higher than visibility, stop and output an error description
-   output-print "The diver will not commit to sampling an area that it will not be able to see"
+   output-print "The diver will not be able to see the sample area"
    output-print "Stopping simulation"
    stop 
   ]
+  
+  
+  ask timetransdivers [                                                                  ; divers count the fishes, unless they are finished
+   if not finished? [t.count.fishes]
+  ]
+
+  ask distransdivers [
+   if not finished? [d.count.fishes] 
+  ]
+  
+  ask statdivers [
+    if not finished? [s.count.fishes]
+  ]
+
+  ask rovdivers [
+    if not finished? [r.count.fishes]
+  ]
+    
+  
+  repeat movement.time.step [
+  
   ask timetransdivers [                                           ; move the divers
     ifelse ticks > transect.time.secs [                           ; if their end of sampling conditions are met, set variable "finished?" to "true" and stop moving
      set finished? true 
@@ -278,26 +376,13 @@ to go
     ]
   ]
 
-  ask fishes [                                                      ; move the fishes
+  ask fishes [                                                      ; move the fishes                                                     
     do.fish.movement
-  ]                   
+    ]
+  if smooth.animation? [display]
+  ] ; closes repeat movement.time.step                  
 
-  ask timetransdivers [                                             ; divers count the fishes, unless they are finished
-   if not finished? [t.count.fishes]
-  ]
 
-  ask distransdivers [
-   if not finished? [d.count.fishes] 
-  ]
-  
-  ask statdivers [
-    if not finished? [s.count.fishes]
-  ]
-
-  ask rovdivers [
-    if not finished? [r.count.fishes]
-  ]
-  
   if not super.memory? [                                          ; if super memory is disabled, divers forget fishes they no longer see (a kind of "doorway effect")
    ask timetransdivers [t.forget.fishes]
    ask distransdivers [d.forget.fishes]
@@ -305,10 +390,30 @@ to go
    ask rovdivers [r.forget.fishes] 
   ]
   
-  if ticks mod behavior.change.interval = 0 [ 
-    ask fishes [set.behavior]       ; fishes set a new behavior in the end of the go procedure, every x seconds (determined by behavior.change.interval)
+  
+  ifelse ticks mod behavior.change.interval = 0 [ 
+    ask fishes [set behavior.set? false
+      set.behavior]                                      ; fishes set a new behavior in the end of the go procedure, every x seconds (determined by behavior.change.interval)
+  ] [ask fishes [
+    if detectability < 1 [
+      set visible? random-bernoulli detectability        ; if behavior.change procedure is not called (in which visible? is set), then just set visible? if detectability is lower than 1 (this changes every second and not every x seconds).
+      ]
+    ]
   ]
+  advance-clock
+  tick
 end  ; of go procedure
+
+
+to advance-clock
+  set seconds seconds + 1
+  if seconds = 60 [set minutes minutes + 1 set seconds 0]
+  if minutes = 60 and seconds = 0 [set hours hours + 1 set minutes 0]
+  if hours = 24 and minutes = 0 and seconds = 0 [set day day + 1 set hours 0]
+  if day = 31 and hours = 0 and minutes = 0 and seconds = 0 [set month month + 1 set day 1]
+  if month = 13 and day = 1 and hours = 0 and minutes = 0 and seconds = 0 [set year year + 1 set month 1 set season 1]
+  if month != 1 and (month - 1) mod 3 = 0 and day = 1 and hours = 0 and minutes = 0 and seconds = 0 [set season season + 1]
+end
 
 
 
@@ -347,46 +452,283 @@ end
 ;FISH PROCEDURES
 
 
-;fish movement
+;fish movement model
 
 to do.fish.movement
-  set heading heading + random-float-between (- turning.angle) turning.angle
-  fd speed ; each step is a second, so the speed is basically the distance
+  if schooling? [set schoolmates other fishes in-cone perception.dist perception.angle with [species = [species] of myself]]    ; if schooling is true,look for conspecifics in my vicinity
+ 
+  set acceleration (list 0 0)                                                                                                   ; acceleration at each step is determined entirely by the urges
+
+    
+    add-urge patch-center-urge patch.gathering.w
+    add-urge wander-urge wander.w
+    add-urge avoid-obstacle-urge obstacle.avoidance.w
+    add-urge avoid-predator-urge predator.avoidance.w
+    add-urge avoid-diver-urge diver.avoidance.w
+    add-urge rest-urge rest.w
+
+  if count schoolmates > 0 and schooling?                                                        ; if I'm not in a school ignore the school related urges. If schooling is disabled, ignore them as well
+  [ add-urge spacing-urge spacing.w
+    add-urge center-urge center.w
+    add-urge align-urge align.w ]
+  
+  let deceleration (scale ((drag.formula * ((magnitude velocity) ^ 2))) (normalize velocity))    ; subtract the deceleration due to drag from the acceleration vector
+  set acceleration (add acceleration deceleration)
+  
+  if magnitude acceleration > max.acceleration                                                   ; keep the acceleration within the accepted range. It is important that this is done after accounting for drag, so that max.acceleration can be reached.
+  [ set acceleration
+    (scale
+        max.acceleration
+        normalize acceleration) ]
+
+  set velocity (add velocity acceleration)                                                       ; the new velocity of the fish is sum of the acceleration and the old velocity.
+
+  if magnitude velocity > max.velocity                                                           ; keep the velocity within the accepted range
+  [ set velocity
+    (scale
+        max.velocity
+        normalize velocity) ]
+
+  let nxcor xcor + ( first velocity )
+  let nycor ycor + ( last velocity )
+  if magnitude velocity > 0.2 [
+    facexy nxcor nycor
+    fd (magnitude velocity) / movement.time.step]
+  
+end ;of do.fish.movement
+
+to add-urge [urge factor]                                              ;fish procedure
+  set acceleration add acceleration scale factor normalize urge
 end
 
-;behavior change
+to pick.patch                                                          ;fish procedure
+  if picked.patch = false [
+   let chosen.patch one-of patches in-cone picked.patch.dist perception.angle
+   
+   if [pxcor] of chosen.patch > (world-width - (picked.patch.dist + 1)) [                                              ; create a (picked.patch.dist + 1) -wide buffer so that picked patches are not too close to the edges
+    let new.chosen.patch patch ([pxcor] of chosen.patch - (picked.patch.dist + 1)) ([pycor] of chosen.patch)
+    set chosen.patch new.chosen.patch 
+   ]
+   if [pxcor] of chosen.patch < (picked.patch.dist + 1) [
+    let new.chosen.patch patch ([pxcor] of chosen.patch + (picked.patch.dist + 1)) ([pycor] of chosen.patch)
+    set chosen.patch new.chosen.patch 
+   ]
+   if [pycor] of chosen.patch > (world-height - (picked.patch.dist + 1)) [
+    let new.chosen.patch patch ([pxcor] of chosen.patch) ([pycor] of chosen.patch - (picked.patch.dist + 1))
+    set chosen.patch new.chosen.patch 
+   ]   
+   if [pycor] of chosen.patch < (picked.patch.dist + 1) [
+    let new.chosen.patch patch ([pxcor] of chosen.patch) ([pycor] of chosen.patch + (picked.patch.dist + 1))
+    set chosen.patch new.chosen.patch 
+   ]    
+   
+   set picked.patch chosen.patch
+   if any? schoolmates [
+    ask schoolmates [
+     set picked.patch chosen.patch 
+    ]
+   ]]  
+end
 
-to set.behavior
-  let pairs (map list behavior.list behavior.freqs)                    ; pairs behavior names with probabilities as lists within a list, to work better with the rnd extension: [[beh1 0.2] [beh2 0.3] [beh3 0.5]]
-  set current.behavior first rnd:weighted-one-of pairs [ last ? ]      ; pick a random behavior from behavior list, using a weighted random pick
-  let param.pos position current.behavior behavior.list                ; check which behavior was picked (1, 2, 3 or 4)
-  let params item param.pos behavior.params                            ; retreive speed and turning angle from the correct position in behavior.params
-  set speed first params                                               ; set the new values for the movement algorithm
-  set turning.angle last params
+;procedure that selects a new behavior and fills in behavior parameters
+
+to set.behavior                                                        ; fish procedure
+  if not behavior.set? [
+    let pairs (map list behavior.list behavior.freqs)                    ; pairs behavior names with probabilities as lists within a list, to work better with the rnd extension: [[b1 0.2] [b2 0.3] [b3 0.5]]
+    set current.behavior first rnd:weighted-one-of pairs [ last ? ]      ; pick a random behavior from behavior list, using a weighted random pick
+    let param.pos position current.behavior behavior.list                ; check which behavior was picked (1, 2, 3 or 4)
+    let params item param.pos behavior.params                            ; retreive list of parameters from the correct position in behavior.params
+    set detectability item 2 params
+    set schooling? item 3 params
+    set cruise.distance item 4 params
+    set align.w item 5 params
+    set center.w item 6 params
+    set spacing.w item 7 params
+    set wander.w item 8 params
+    set rest.w item 9 params
+    set picked.patch.dist item 10 params
+    set patch.gathering.w item 11 params
+    set obstacle.avoidance.w item 12 params
+    set predator.avoidance.w item 13 params
+    set prey.chasing.w item 14 params
+    set diver.avoidance.w item 15 params
+    if detectability < 1 [set visible? random-bernoulli detectability]
+    set behavior.set? true
+    if any? schoolmates [
+      ask schoolmates [
+        set current.behavior [current.behavior] of myself                         
+        set detectability item 2 params
+        set schooling? item 3 params
+        set cruise.distance item 4 params
+        set align.w item 5 params
+        set center.w item 6 params
+        set spacing.w item 7 params
+        set wander.w item 8 params
+        set rest.w item 9 params
+        set picked.patch.dist item 10 params
+        set patch.gathering.w item 11 params
+        set obstacle.avoidance.w item 12 params
+        set predator.avoidance.w item 13 params
+        set prey.chasing.w item 14 params
+        set diver.avoidance.w item 15 params
+        if detectability < 1 [set visible? random-bernoulli detectability]
+        set behavior.set? true
+      ]      
+    ]
+    ifelse patch.gathering.w > 0 [                                       ; if selected behavior has patch gathering urge, pick a patch. If in a school, ask schoolmates to pick a patch collectively.
+      pick.patch] [set picked.patch false]                               ; if patch gathering urge has zero weight, variable picked.patch is set to false (important for pick.patch procedure).
+  ]
+end
+
+; fish urges
+
+to-report patch-center-urge  ;; fish reporter
+  ifelse picked.patch != false [
+    let patch-x [pxcor] of picked.patch
+    let patch-y [pycor] of picked.patch
+    ifelse distancexy patch-x patch-y > picked.patch.dist   ; distance to picked patch
+     [ report (list (patch-x - xcor) (patch-y - ycor)) ]   ; number of coordinate units (vertical and horizontal) needed to get to picked.patch
+     [ report (list 0 0) ]
+    ] [ report (list 0 0) ]
 end
 
 
+to-report center-urge ;; fish reporter
+  ;; report the average distance from my schoolmates
+  ;; in each direction
+  if count schoolmates = 0 or center.w = 0
+  [ report (list 0 0) ]
+  report
+    (map
+      [ ?2 - ?1 ]
+      (list xcor ycor)
+      (list
+        mean [ xcor ] of schoolmates
+        mean [ ycor ] of schoolmates ) )
+end
 
+to-report align-urge ;; fish reporter
+  ;; report the average difference in velocity
+  ;; from my school mates
+  if count schoolmates = 0 or align.w = 0
+  [ report (list 0 0) ]
+  report normalize (
+    ( map
+      [ ?1 - ?2 ]
+      (list
+        mean [ first velocity ] of schoolmates   ; x component
+        mean [ last velocity ] of schoolmates )  ; y component
+      velocity ))
+end
+
+to-report rest-urge ;; fish reporter
+  ;; report the difference in velocity
+  ;; from [0 0]
+  report subtract [0 0] velocity
+end
+
+to-report wander-urge ; fish reporter
+  ;; report 2 random numbers between -1 and 1
+  report n-values 2 [ (random-float 2) - 1 ]
+end
+
+to-report spacing-urge ;; fish reporter
+  let urge [ 0 0 ]
+  ;; report the sum of the distances to fishes
+  ;; in my school that are closer to me than
+  ;; cruise.distance (in body lengths)
+  ask schoolmates with [ distance myself < (cruise.distance * size) ] [
+    set urge
+      add
+        urge
+        (subtract
+          (list [xcor] of myself [ycor] of myself)
+          (list xcor ycor))
+  ]
+  report urge
+end
+
+to-report avoid-obstacle-urge ;; fish reporter
+ let urge (list 0 0)
+  if obstacle.avoidance.w = 0 [ report urge ]
+  ;; report the sum of the distances from
+  ;; any patches that are obstacles
+  ;; in each direction
+  ask patches in-cone perception.dist perception.angle with [ pcolor = brown ]   ; patches that are brown are obstacles
+  [ set urge
+      add
+        urge
+        subtract
+          (list [xcor] of myself [ycor] of myself)
+          (list pxcor pycor)
+  ]
+  report urge
+end
+
+to-report avoid-predator-urge ;; fish reporter
+; a normalized vector that is opposite to the position of the predator,
+; and scale it by the inverse of the squared distance to the predator, as a proportion of approach.dist
+ let urge (list 0 0)
+  if predator.avoidance.w = 0 [ report urge ]
+  ask other fishes in-cone approach.dist perception.angle with [prey.type = "fish"]
+  [ let real.dist magnitude (subtract (list [xcor] of myself [ycor] of myself) (list xcor ycor))
+    set urge scale ([approach.dist] of myself ^ 2 / real.dist) (normalize (add urge subtract (list [xcor] of myself [ycor] of myself) (list xcor ycor)))   ; WHAT IF REAL DIST IS ZERO?!!
+  ]
+  report urge
+end
+
+to-report avoid-diver-urge ;; fish reporter
+; a normalized vector that is opposite to the position of the diver,
+; and scale it by the inverse of the squared distance to the diver, as a proportion of approach.dist
+ let urge (list 0 0)
+  if diver.avoidance.w = 0 [ report urge ]
+  ask divers in-cone approach.dist perception.angle 
+  [ let real.dist magnitude (subtract (list [xcor] of myself [ycor] of myself) (list xcor ycor))
+    set urge scale ([approach.dist] of myself ^ 2 / real.dist) (normalize (add urge subtract (list [xcor] of myself [ycor] of myself) (list xcor ycor)))
+  ]
+  report urge
+end
+
+; vector operations
+
+to-report add [ v1 v2 ]
+  report (map [ ?1 + ?2 ] v1 v2)
+end
+
+to-report subtract [ v1 v2 ]
+  report (map [ ?1 - ?2 ] v1 v2)
+end
+
+to-report scale [ scalar vector ]
+  report map [ scalar * ? ] vector
+end
+
+to-report magnitude [ vector ]
+  report sqrt sum map [ ? * ? ] vector
+end
+
+to-report normalize [ vector ]
+  let m magnitude vector
+  if m = 0 [ report vector ]
+  report map [ ? / m ] vector
+end
 
 ;DIVER PROCEDURES
 
 ;Distance transect diver procedures
 
 to do.ddiver.movement
-  fd speed ; each step is a second, so the speed is basically the distance
+  fd speed / movement.time.step ; each step is a second, so the speed is basically the distance divided by the movement.time.step
 end
 
 to d.count.fishes                      ; for fixed distance transects, there is a limit to the y coordinate (the diver doesn't count beyond the end mark of the transect)
   let myxcor xcor
   let my.final.ycor final.ycor
   let seen.fishes fishes in-cone max.visibility distransdiver.viewangle
-  let eligible.fishes seen.fishes with [(xcor > myxcor - (distance.transect.width / 2)) and (xcor < myxcor + (distance.transect.width / 2)) and (ycor < my.final.ycor)]  ; this only works for transects heading north.
-                                                                                                                                                                      ; Also, this doesn't work if the diver gets near
-                                                                                                                                                                      ; the top border. Divers and fish wrap to the bottom
-                                                                                                                                                                      ; again, but the divers only start counting correctly
-                                                                                                                                                                      ; again when they reach the other side.
+  let eligible.fishes seen.fishes with [(xcor > myxcor - (distance.transect.width / 2)) and (xcor < myxcor + (distance.transect.width / 2)) and (ycor < my.final.ycor)]  ; distance transects have a limit in ycor as well
+  let identifiable.fishes eligible.fishes with [visible.dist <= distance myself and visible?]      ; only fish that are closer to the diver than their visible.dist and are visible are counted
   let diver.memory memory
-  let new.fishes eligible.fishes with [not member? who diver.memory] ; only fishes that are not remembered are counted
+  let new.fishes identifiable.fishes with [not member? who diver.memory] ; only fishes that are not remembered are counted
   if any? new.fishes [
     let new.records ([species] of new.fishes)
     set counted.fishes sentence counted.fishes new.records
@@ -404,15 +746,16 @@ end
 ;Timed transect diver procedures
 
 to do.tdiver.movement
-  fd speed ; each step is a second, so the speed is basically the distance
+  fd speed / movement.time.step ; each step is a second, so the speed is basically the distance divided by the movement.time.step
 end
 
 to t.count.fishes
   let myxcor xcor
   let seen.fishes fishes in-cone max.visibility timetransdiver.viewangle
   let eligible.fishes seen.fishes with [(xcor > myxcor - (timed.transect.width / 2)) and (xcor < myxcor + (timed.transect.width / 2))]  ; this only works for transects heading north, of course
+  let identifiable.fishes eligible.fishes with [visible.dist <= distance myself and visible?]
   let diver.memory memory
-  let new.fishes eligible.fishes with [not member? who diver.memory] ; only fishes that are not remembered are counted
+  let new.fishes identifiable.fishes with [not member? who diver.memory] ; only fishes that are not remembered are counted
   if any? new.fishes [
     let new.records ([species] of new.fishes)
     set counted.fishes sentence counted.fishes new.records
@@ -430,14 +773,15 @@ end
 ;Stationary diver procedures
 
 to do.stdiver.movement
-  set heading heading + stationary.turning.angle            ; turns clockwise every second
+  set heading heading + (stationary.turning.angle / movement.time.step)            ; turns clockwise every second
   
 end
 
 to s.count.fishes
   let eligible.fishes fishes in-cone stationary.radius statdiver.viewangle
+  let identifiable.fishes eligible.fishes with [visible.dist <= distance myself and visible?]
   let diver.memory memory
-  let new.fishes eligible.fishes with [not member? who diver.memory] ; only fishes that are not remembered are counted
+  let new.fishes identifiable.fishes with [not member? who diver.memory] ; only fishes that are not remembered are counted
   if any? new.fishes [
     let new.records ([species] of new.fishes)
     set counted.fishes sentence counted.fishes new.records
@@ -455,13 +799,14 @@ end
 
 to do.rdiver.movement
   if ticks mod 2 = 0 [set heading heading + random-float-between (- roving.diver.turning.angle) roving.diver.turning.angle]         ;turning happens every 2 seconds
-  fd speed ; each step is a second, so the speed is basically the distance
+  fd speed / movement.time.step ; each step is a second, so the speed is basically the distance divided by the movement.time.step
 end
 
 to r.count.fishes
   let eligible.fishes fishes in-cone max.visibility statdiver.viewangle
+  let identifiable.fishes eligible.fishes with [visible.dist <= distance myself and visible?]
   let diver.memory memory
-  let new.fishes eligible.fishes with [not member? who diver.memory] ; only fishes that were not previously counted are counted
+  let new.fishes identifiable.fishes with [not member? who diver.memory] ; only fishes that were not previously counted are counted
   if any? new.fishes [
     let new.records ([species] of new.fishes)
     set counted.fishes sentence counted.fishes new.records
@@ -475,36 +820,31 @@ to r.forget.fishes          ; runs if super memory is off
   set memory filter [member? ? seen.fish.id] diver.memory
 end
 
-;reporters
 
-to-report random-float-between [a b]
+; useful reporters
+
+to-report random-bernoulli [probability-true]
+  if probability-true < 0.0 or probability-true > 1.0 [user-message "WARNING: probability outside 0-1 range in random-bernoulli reporter."]
+  report random-float 1.0 < probability-true
+end
+
+to-report random-float-between [a b]           ; generate a random float between two numbers
   report random-float (b - a + 1) + a
 end
 
-to-report t.bias-result        ; these reporters are outputs for BehaviourSpace experiments
-  report [t.bias] of one-of timetransdivers  ; one-of makes it output a single number instead of a list with one value (a list would be [34] instead of 34)
-end
-
-to-report s.bias-result
-  report [s.bias] of one-of statdivers
-end
-
-to-report stationary.factor.value
-  report s.bias-result + 1
-end
-
-to-report transect.factor.value
-  report t.bias-result + 1
+to-report occurrences [x the-list]             ; count the number of occurrences of an item in a list (useful for summarizing species lists)
+  report reduce
+    [ifelse-value (?2 = x) [?1 + 1] [?1]] (fput 0 the-list)
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-475
-7
-720
-638
+415
+10
+1025
+2441
 -1
 -1
-2.0
+30.0
 1
 10
 1
@@ -515,20 +855,20 @@ GRAPHICS-WINDOW
 1
 1
 0
-99
+19
 0
-299
+79
 1
 1
 1
 seconds
-1.0
+5.0
 
 BUTTON
-905
-65
-969
-98
+120
+160
+205
+210
 Setup
 setup
 NIL
@@ -542,11 +882,11 @@ NIL
 1
 
 BUTTON
-973
-65
-1036
-98
-Go
+205
+160
+325
+210
+Go / Pause
 go
 T
 1
@@ -556,13 +896,13 @@ NIL
 NIL
 NIL
 NIL
-1
+0
 
 BUTTON
-1041
-65
-1121
-98
+325
+160
+410
+210
 Go once
 go
 NIL
@@ -573,59 +913,59 @@ NIL
 NIL
 NIL
 NIL
-1
+0
 
 MONITOR
-910
-370
-1010
-415
+115
+70
+210
+115
 Total area (m2)
-actual.area
+world.area
 0
 1
 11
 
 SLIDER
-26
-41
-249
-74
+1035
+55
+1250
+88
 timed.transect.diver.speed
 timed.transect.diver.speed
 1
-7
-4
+10
+8
 1
 1
 m/min
 HORIZONTAL
 
 TEXTBOX
-29
-21
-239
-47
+1035
+40
+1190
+58
 Timed transect diver movement
 11
 0.0
 1
 
 TEXTBOX
-30
-245
-180
-263
+1035
+290
+1185
+308
 Stationary diver movement
 11
 0.0
 1
 
 SLIDER
-25
-265
-248
-298
+1035
+305
+1250
+338
 stationary.turning.angle
 stationary.turning.angle
 0
@@ -633,39 +973,29 @@ stationary.turning.angle
 4
 1
 1
-degrees / sec
+º / sec
 HORIZONTAL
 
-CHOOSER
-26
-80
-163
-125
-timed.transect.width
-timed.transect.width
-1 2 4 5 8 10 20
-2
-
 SLIDER
-905
-233
-1077
-266
+1270
+120
+1485
+153
 max.visibility
 max.visibility
 5
 40
-13
+10
 1
 1
 m
 HORIZONTAL
 
 SLIDER
-24
-304
-196
-337
+1035
+340
+1250
+373
 stationary.radius
 stationary.radius
 1
@@ -673,24 +1003,14 @@ stationary.radius
 7.5
 0.5
 1
-NIL
+m
 HORIZONTAL
 
-TEXTBOX
-127
-104
-153
-123
-m
-11
-0.0
-1
-
 SWITCH
-907
-275
-1044
-308
+1270
+55
+1485
+88
 super.memory?
 super.memory?
 1
@@ -698,42 +1018,42 @@ super.memory?
 -1000
 
 OUTPUT
-690
-480
-1110
-635
-12
+15
+390
+410
+500
+11
 
 SLIDER
-261
-41
-451
-74
+1035
+430
+1250
+463
 roving.diver.speed
 roving.diver.speed
 1
-7
-4
+10
+8
 1
 1
 m/min
 HORIZONTAL
 
 TEXTBOX
-263
-21
-413
-39
+1035
+415
+1155
+433
 Roving diver movement
 11
 0.0
 1
 
 SLIDER
-261
-82
-469
-115
+1035
+465
+1250
+498
 roving.diver.turning.angle
 roving.diver.turning.angle
 0
@@ -745,10 +1065,10 @@ roving.diver.turning.angle
 HORIZONTAL
 
 SWITCH
-25
-370
-195
-403
+15
+565
+190
+598
 timed.transect.diver?
 timed.transect.diver?
 1
@@ -756,10 +1076,10 @@ timed.transect.diver?
 -1000
 
 SWITCH
-25
-440
-195
-473
+15
+635
+190
+668
 stationary.diver?
 stationary.diver?
 1
@@ -767,10 +1087,10 @@ stationary.diver?
 -1000
 
 SWITCH
-25
-475
-195
-508
+15
+670
+190
+703
 roving.diver?
 roving.diver?
 1
@@ -778,31 +1098,31 @@ roving.diver?
 -1000
 
 TEXTBOX
-30
-350
-180
-368
+20
+545
+170
+563
 Select active sampling methods
 11
 0.0
 1
 
 SWITCH
-1100
-330
-1226
-363
+200
+305
+410
+338
 show.paths?
 show.paths?
-0
+1
 1
 -1000
 
 SWITCH
-910
-330
-1096
-363
+15
+305
+201
+338
 show.diver.detail.windows?
 show.diver.detail.windows?
 1
@@ -810,40 +1130,30 @@ show.diver.detail.windows?
 -1000
 
 TEXTBOX
-910
-314
-1060
-332
+20
+285
+95
+303
 Display options
 11
 0.0
 1
 
 TEXTBOX
-1050
-280
-1295
-305
-Ability to remember all counted fishes (If turned off, divers forget fishes that leave the FOV)
-11
-0.0
-1
-
-TEXTBOX
-200
-320
-229
-338
-m
+1270
+10
+1505
+51
+Ability to remember all counted fishes (If turned off, divers forget fishes that leave the FOV). Applies to all divers.
 11
 0.0
 1
 
 BUTTON
-1115
-480
-1200
-635
+15
+500
+410
+535
 Clear output
 clear-output
 NIL
@@ -857,10 +1167,10 @@ NIL
 1
 
 BUTTON
-200
-370
-266
-403
+190
+565
+255
+598
 Follow
 if any? timetransdivers [follow one-of timetransdivers]
 NIL
@@ -874,10 +1184,10 @@ NIL
 1
 
 BUTTON
-200
-440
-266
-473
+190
+635
+255
+668
 Follow
 if any? statdivers [follow one-of statdivers]
 NIL
@@ -891,10 +1201,10 @@ NIL
 1
 
 BUTTON
-200
-475
-266
-508
+190
+670
+255
+703
 Follow
 if any? rovdivers [follow one-of rovdivers]
 NIL
@@ -908,11 +1218,11 @@ NIL
 1
 
 BUTTON
-25
-510
-195
-543
-Stop following divers
+15
+705
+255
+738
+Reset perspective
 reset-perspective
 NIL
 1
@@ -925,10 +1235,10 @@ NIL
 1
 
 SWITCH
-25
-405
-195
-438
+15
+600
+190
+633
 distance.transect.diver?
 distance.transect.diver?
 0
@@ -936,10 +1246,10 @@ distance.transect.diver?
 -1000
 
 BUTTON
-200
-405
-266
-438
+190
+600
+255
+633
 Follow
 follow one-of distransdivers
 NIL
@@ -953,25 +1263,25 @@ NIL
 1
 
 SLIDER
-270
-370
-442
-403
+1035
+125
+1250
+158
 transect.time
 transect.time
 1
 90
-2
+1
 1
 1
 minutes
 HORIZONTAL
 
 SLIDER
-270
-405
-442
-438
+1035
+250
+1250
+283
 transect.distance
 transect.distance
 5
@@ -983,75 +1293,65 @@ meters
 HORIZONTAL
 
 SLIDER
-270
-440
-442
-473
+1035
+375
+1250
+408
 stationary.time
 stationary.time
 1
 90
-5
+2
 1
 1
 minutes
 HORIZONTAL
 
 SLIDER
-270
-475
-442
-508
+1035
+500
+1250
+533
 roving.time
 roving.time
 1
 90
-5
+2
 1
 1
 minutes
 HORIZONTAL
 
 TEXTBOX
-30
-130
-210
-156
+1035
+165
+1205
+183
 Distance transect diver movement
 11
 0.0
 1
 
 SLIDER
-25
-150
-245
-183
+1035
+180
+1250
+213
 distance.transect.diver.speed
 distance.transect.diver.speed
 1
-7
-4
+10
+8
 1
 1
 m/min
 HORIZONTAL
 
-CHOOSER
-25
-190
-177
-235
-distance.transect.width
-distance.transect.width
-1 2 4 5 8 10 20
-0
-
 MONITOR
-905
-110
-1012
-155
+15
+70
+115
+115
 Total nr. of fishes
 numb.fishes
 0
@@ -1059,10 +1359,10 @@ numb.fishes
 11
 
 MONITOR
-1015
-110
-1097
-155
+210
+70
+310
+115
 Total density
 total.density
 3
@@ -1070,10 +1370,10 @@ total.density
 11
 
 MONITOR
-1100
-110
-1212
-155
+310
+70
+410
+115
 Number of species
 nr.species
 17
@@ -1081,10 +1381,10 @@ nr.species
 11
 
 SLIDER
-260
-150
-465
-183
+1270
+185
+1485
+218
 behavior.change.interval
 behavior.change.interval
 1
@@ -1096,20 +1396,20 @@ seconds
 HORIZONTAL
 
 TEXTBOX
-265
-130
-350
-148
-Fish movement
+1270
+170
+1470
+188
+Time between behavior changes in fish.
 11
 0.0
 1
 
 BUTTON
-260
-185
-465
-218
+270
+600
+400
+670
 Focus on a random fish
 let chosen.one one-of fishes\nfollow chosen.one\ninspect chosen.one
 NIL
@@ -1120,6 +1420,283 @@ NIL
 NIL
 NIL
 NIL
+1
+
+MONITOR
+310
+25
+360
+66
+NIL
+minutes
+0
+1
+10
+
+MONITOR
+260
+25
+310
+66
+NIL
+hours
+0
+1
+10
+
+MONITOR
+210
+25
+260
+66
+NIL
+day
+0
+1
+10
+
+MONITOR
+160
+25
+210
+66
+NIL
+month
+0
+1
+10
+
+MONITOR
+110
+25
+160
+66
+NIL
+season
+0
+1
+10
+
+MONITOR
+60
+25
+110
+66
+NIL
+year
+0
+1
+10
+
+MONITOR
+360
+25
+410
+66
+NIL
+seconds
+0
+1
+10
+
+SWITCH
+15
+340
+200
+373
+smooth.animation?
+smooth.animation?
+1
+1
+-1000
+
+BUTTON
+15
+160
+120
+210
+Import dataset
+import-dataset
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+TEXTBOX
+15
+10
+165
+28
+Model clock / calendar
+11
+0.0
+1
+
+TEXTBOX
+205
+345
+335
+371
+Disable smooth animation for faster model runs.
+11
+0.0
+1
+
+TEXTBOX
+35
+135
+105
+153
+1. Start here
+11
+15.0
+1
+
+TEXTBOX
+125
+130
+210
+160
+2. Establish initial conditions
+11
+15.0
+1
+
+TEXTBOX
+225
+135
+320
+153
+3. Run the model
+11
+15.0
+1
+
+TEXTBOX
+1040
+15
+1250
+33
+DIVER MOVEMENT____________________
+11
+0.0
+1
+
+SLIDER
+1035
+90
+1250
+123
+timed.transect.width
+timed.transect.width
+1
+20
+2
+1
+1
+m
+HORIZONTAL
+
+SLIDER
+1035
+215
+1250
+248
+distance.transect.width
+distance.transect.width
+1
+20
+2
+1
+1
+m
+HORIZONTAL
+
+TEXTBOX
+65
+740
+215
+766
+(Stop following divers or fish)
+11
+0.0
+1
+
+TEXTBOX
+1270
+100
+1510
+118
+Water visibility (Affects the divers' field of view)
+11
+0.0
+1
+
+CHOOSER
+1270
+270
+1485
+315
+movement.time.step
+movement.time.step
+5 10
+0
+
+TEXTBOX
+1270
+225
+1505
+270
+Time step for each decision in the fish movement model. This must match the frame rate in model settings for normal speed to match real time.
+11
+0.0
+1
+
+TEXTBOX
+1270
+320
+1510
+375
+Please test behaviors in the species creator with the same frame rate. Different frame rates can lead to very different behaviors with the same parameters.
+11
+15.0
+1
+
+SWITCH
+15
+235
+132
+268
+fixed.seed?
+fixed.seed?
+1
+1
+-1000
+
+INPUTBOX
+135
+220
+215
+280
+seed
+123456
+1
+0
+Number
+
+TEXTBOX
+225
+235
+380
+265
+Select a fixed seed to generate similar consecutive model runs.
+11
+0.0
 1
 
 @#$#@#$#@
@@ -1353,6 +1930,16 @@ false
 0
 Circle -7500403 true true 0 0 300
 
+diver
+true
+0
+Polygon -7500403 true true 105 90 120 180 120 270 105 300 135 300 150 210 165 300 195 300 180 270 180 180 195 90
+Rectangle -7500403 true true 135 75 165 90
+Polygon -7500403 true true 180 120 195 30 210 45 210 105
+Polygon -7500403 true true 120 120 105 30 90 45 90 105
+Rectangle -1184463 true false 135 90 165 195
+Circle -16777216 true false 120 30 60
+
 dot
 false
 0
@@ -1391,14 +1978,10 @@ Polygon -1 true false 75 45 83 77 71 103 86 114 166 78 135 60
 Polygon -7500403 true true 30 136 151 77 226 81 280 119 292 146 292 160 287 170 270 195 195 210 151 212 30 166
 Circle -16777216 true false 215 106 30
 
-fish rotate
+fish top
 true
 0
-Polygon -1 true false 44 131 21 87 15 86 0 120 15 150 0 180 13 214 20 212 45 166
-Polygon -1 true false 135 195 119 235 95 218 76 210 46 204 60 165
-Polygon -1 true false 75 45 83 77 71 103 86 114 166 78 135 60
-Polygon -7500403 true true 30 136 151 77 226 81 280 119 292 146 292 160 287 170 270 195 195 210 151 212 30 166
-Circle -16777216 true false 215 106 30
+Polygon -7500403 true true 157 1 142 1 104 45 104 75 89 120 104 120 117 191 137 243 147 304 181 240 184 189 194 120 209 120 194 75 194 45
 
 flag
 false
@@ -1456,15 +2039,6 @@ Polygon -7500403 true true 150 15 15 120 60 285 240 285 285 120
 
 person
 false
-0
-Circle -7500403 true true 110 5 80
-Polygon -7500403 true true 105 90 120 195 90 285 105 300 135 300 150 225 165 300 195 300 210 285 180 195 195 90
-Rectangle -7500403 true true 127 79 172 94
-Polygon -7500403 true true 195 90 240 150 225 180 165 105
-Polygon -7500403 true true 105 90 60 150 75 180 135 105
-
-person rotate
-true
 0
 Circle -7500403 true true 110 5 80
 Polygon -7500403 true true 105 90 120 195 90 285 105 300 135 300 150 225 165 300 195 300 210 285 180 195 195 90
