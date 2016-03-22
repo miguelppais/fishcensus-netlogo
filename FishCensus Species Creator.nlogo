@@ -14,6 +14,7 @@ b3.sp.param
 b4.sp.param
 loaded.behavior
 wat.dens.value
+schoolmate-counts
 ]
 
 predators-own [
@@ -102,6 +103,7 @@ to go
     ]
   ask divers [fd 8 / (60 * movement.time.step)]
   if smooth.animation?  [display]
+  if recording [movie-grab-view]
   ]
   ask predators [if satiety > 0 [set satiety satiety - 5]]
   tick
@@ -712,7 +714,7 @@ fish.density
 fish.density
 0
 1
-0.3
+0.51
 0.01
 1
 fishes / m^2
@@ -727,7 +729,7 @@ perception.dist
 perception.dist
 0.05
 5
-0.5
+2
 0.05
 1
 meters
@@ -742,7 +744,7 @@ max.sustained.speed
 max.sustained.speed
 0
 10
-0.3
+0.9
 0.1
 1
 m/s
@@ -757,7 +759,7 @@ max.acceleration
 max.acceleration
 0
 2
-0.1
+0.2
 0.05
 1
 m/s^2
@@ -772,7 +774,7 @@ cruise.distance
 cruise.distance
 0.1
 10
-3
+1
 0.1
 1
 body lenghts
@@ -787,7 +789,7 @@ spacing.w
 spacing.w
 0
 50
-0
+15
 1
 1
 NIL
@@ -802,7 +804,7 @@ center.w
 center.w
 0
 20
-0
+6
 1
 1
 NIL
@@ -817,7 +819,7 @@ align.w
 align.w
 0
 20
-0
+5
 1
 1
 NIL
@@ -881,7 +883,7 @@ picked.patch.dist
 picked.patch.dist
 0
 10
-3
+1
 0.5
 1
 meters
@@ -896,7 +898,7 @@ predator.avoidance.w
 predator.avoidance.w
 -5
 100
-10
+100
 1
 1
 NIL
@@ -909,7 +911,7 @@ SWITCH
 448
 schooling?
 schooling?
-1
+0
 1
 -1000
 
@@ -922,7 +924,7 @@ perception.angle
 perception.angle
 45
 360
-360
+320
 5
 1
 degrees
@@ -937,7 +939,7 @@ diver.avoidance.w
 diver.avoidance.w
 -5
 100
-10
+100
 1
 1
 NIL
@@ -952,7 +954,7 @@ patch.gathering.w
 patch.gathering.w
 0
 20
-6
+0
 1
 1
 NIL
@@ -967,7 +969,7 @@ approach.dist
 approach.dist
 0.5
 10
-0.7
+1
 0.1
 1
 meters
@@ -979,7 +981,7 @@ INPUTBOX
 255
 70
 species.name
-Cryptic
+Large schools
 1
 0
 String
@@ -1051,7 +1053,7 @@ INPUTBOX
 165
 860
 B1.name
-guarding
+wandering
 1
 0
 String
@@ -1079,7 +1081,7 @@ INPUTBOX
 165
 920
 B2.name
-feeding
+n/a
 1
 0
 String
@@ -1090,7 +1092,7 @@ INPUTBOX
 165
 980
 B3.name
-nested
+n/a
 1
 0
 String
@@ -1101,7 +1103,7 @@ INPUTBOX
 165
 1040
 B4.name
-patrolling
+n/a
 1
 0
 String
@@ -1234,7 +1236,7 @@ fish.size
 fish.size
 0.05
 1
-0.1
+0.2
 0.01
 1
 meters
@@ -1293,7 +1295,7 @@ visible.dist
 visible.dist
 0.5
 20
-1
+4
 0.5
 1
 meters
@@ -1319,7 +1321,7 @@ b1.freq
 b1.freq
 0
 1
-0.25
+1
 0.05
 1
 NIL
@@ -1334,7 +1336,7 @@ b2.freq
 b2.freq
 0
 1
-0.2
+0
 0.05
 1
 NIL
@@ -1349,7 +1351,7 @@ b3.freq
 b3.freq
 0
 1
-0.1
+0
 0.05
 1
 NIL
@@ -1364,7 +1366,7 @@ b4.freq
 b4.freq
 0
 1
-0.45
+0
 0.05
 1
 NIL
@@ -1436,7 +1438,7 @@ prey.chasing.w
 prey.chasing.w
 0
 50
-0
+1
 1
 1
 NIL
@@ -1585,7 +1587,7 @@ rest.w
 rest.w
 0
 20
-1
+0
 1
 1
 NIL
@@ -1818,7 +1820,7 @@ burst.speed
 burst.speed
 0
 10
-1.1
+2.6
 0.1
 1
 m/s
@@ -1878,7 +1880,7 @@ cruise.w
 cruise.w
 0
 10
-0
+7
 1
 1
 NIL
@@ -2084,6 +2086,93 @@ NIL
 NIL
 NIL
 NIL
+1
+
+BUTTON
+530
+950
+720
+1000
+Calculate average school size
+if not schooling? [print \"Schooling is disabled\" stop]\nset schoolmate-counts []\nask fishes with [count other fishes in-radius school.size.reference.radius > 1] [\nset schoolmate-counts lput (count other fishes in-radius school.size.reference.radius) schoolmate-counts\n]\noutput-print (word \"Average school size is \" precision (mean schoolmate-counts) 0 \" +/- \" precision (standard-deviation schoolmate-counts) 0)
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+0
+
+SLIDER
+530
+1005
+720
+1038
+school.size.reference.radius
+school.size.reference.radius
+0.1
+5
+1
+0.1
+1
+m
+HORIZONTAL
+
+BUTTON
+1065
+1005
+1140
+1038
+Stop
+movie-close\nset recording FALSE
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+BUTTON
+955
+970
+1140
+1003
+Create new movie
+let movie.name user-input \"Pick a name for the movie file (exclude extension).\"\nmovie-start word movie.name \".mov\"\nmovie-set-frame-rate movement.time.step\nuser-message (word \"File \" movie.name \".mov created. Press record to start recording!\")
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+SWITCH
+955
+1005
+1062
+1038
+Recording
+Recording
+1
+1
+-1000
+
+TEXTBOX
+950
+950
+1100
+968
+VIDEO RECORDER
+12
+0.0
 1
 
 @#$#@#$#@
@@ -2469,7 +2558,7 @@ Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 
 @#$#@#$#@
-NetLogo 5.2.1
+NetLogo 5.3.1
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@

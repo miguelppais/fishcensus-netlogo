@@ -1,0 +1,8 @@
+#videos#
+*.mov
+*.mp4
+
+#packages#
+*.zip
+*.rar
+*.7z
