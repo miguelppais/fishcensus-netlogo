@@ -225,7 +225,7 @@ to do.fish.movement  ;; fish procedure
 
   let nxcor xcor + ( first velocity )
   let nycor ycor + ( last velocity )
-  if magnitude velocity > 0.2 [
+  if magnitude velocity > 0.2 [                          ; minimum velocity that triggers movement. This is to prevent erratic movement when stopped.
     facexy nxcor nycor
     fd (magnitude velocity) / movement.time.step]
 
@@ -714,7 +714,7 @@ fish.density
 fish.density
 0
 1
-0.51
+0.3
 0.01
 1
 fishes / m^2
@@ -729,7 +729,7 @@ perception.dist
 perception.dist
 0.05
 5
-2
+0.35
 0.05
 1
 meters
@@ -744,7 +744,7 @@ max.sustained.speed
 max.sustained.speed
 0
 10
-0.9
+0.5
 0.1
 1
 m/s
@@ -898,7 +898,7 @@ predator.avoidance.w
 predator.avoidance.w
 -5
 100
-100
+10
 1
 1
 NIL
@@ -939,7 +939,7 @@ diver.avoidance.w
 diver.avoidance.w
 -5
 100
-100
+10
 1
 1
 NIL
@@ -981,7 +981,7 @@ INPUTBOX
 255
 70
 species.name
-Large schools
+Schooling
 1
 0
 String
@@ -1081,7 +1081,7 @@ INPUTBOX
 165
 920
 B2.name
-n/a
+feeding
 1
 0
 String
@@ -1092,7 +1092,7 @@ INPUTBOX
 165
 980
 B3.name
-n/a
+stationary
 1
 0
 String
@@ -1321,7 +1321,7 @@ b1.freq
 b1.freq
 0
 1
-1
+0.5
 0.05
 1
 NIL
@@ -1336,7 +1336,7 @@ b2.freq
 b2.freq
 0
 1
-0
+0.2
 0.05
 1
 NIL
@@ -1351,7 +1351,7 @@ b3.freq
 b3.freq
 0
 1
-0
+0.3
 0.05
 1
 NIL
@@ -1438,7 +1438,7 @@ prey.chasing.w
 prey.chasing.w
 0
 50
-1
+0
 1
 1
 NIL
@@ -1880,7 +1880,7 @@ cruise.w
 cruise.w
 0
 10
-7
+0
 1
 1
 NIL
@@ -2173,6 +2173,40 @@ TEXTBOX
 VIDEO RECORDER
 12
 0.0
+1
+
+BUTTON
+440
+410
+530
+480
+Show speeds
+ask fishes [set label precision (magnitude velocity) 2]
+T
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+BUTTON
+440
+480
+530
+513
+Clear labels
+ask fishes [set label \"\"]
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
 1
 
 @#$#@#$#@

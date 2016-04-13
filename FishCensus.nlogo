@@ -492,7 +492,7 @@ to do.fish.movement
 
   let nxcor xcor + ( first velocity )
   let nycor ycor + ( last velocity )
-  if magnitude velocity > 0.2 [
+  if magnitude velocity > 0.2 [                                ; minimum velocity that triggers movement. This is to prevent erratic movement when stopped.
     facexy nxcor nycor
     fd (magnitude velocity) / movement.time.step]
 
@@ -2191,7 +2191,7 @@ Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 
 @#$#@#$#@
-NetLogo 5.2.1
+NetLogo 5.3.1
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
