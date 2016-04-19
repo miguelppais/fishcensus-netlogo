@@ -15,6 +15,7 @@ b4.sp.param
 loaded.behavior
 wat.dens.value
 schoolmate-counts
+recording ; start or stop video recording
 ]
 
 predators-own [
@@ -53,6 +54,7 @@ to setup
   clear-drawing
   clear-all-plots
   stop-inspecting-dead-agents                         ; close diver detail windows
+  set recording false
   output-print "Painting floor tiles"
   ask patches with [pycor mod 2 = 0 and pxcor mod 2 = 0] [set pcolor 103]
   ask patches with [pycor mod 2 = 1 and pxcor mod 2 = 1] [set pcolor 103]
@@ -714,7 +716,7 @@ fish.density
 fish.density
 0
 1
-0.3
+0.1
 0.01
 1
 fishes / m^2
@@ -729,7 +731,7 @@ perception.dist
 perception.dist
 0.05
 5
-0.35
+0.7
 0.05
 1
 meters
@@ -744,7 +746,7 @@ max.sustained.speed
 max.sustained.speed
 0
 10
-0.5
+0.4
 0.1
 1
 m/s
@@ -759,7 +761,7 @@ max.acceleration
 max.acceleration
 0
 2
-0.2
+0.1
 0.05
 1
 m/s^2
@@ -789,7 +791,7 @@ spacing.w
 spacing.w
 0
 50
-15
+0
 1
 1
 NIL
@@ -804,7 +806,7 @@ center.w
 center.w
 0
 20
-6
+0
 1
 1
 NIL
@@ -819,7 +821,7 @@ align.w
 align.w
 0
 20
-5
+0
 1
 1
 NIL
@@ -834,7 +836,7 @@ wander.w
 wander.w
 0
 10
-3
+7
 1
 1
 NIL
@@ -911,7 +913,7 @@ SWITCH
 448
 schooling?
 schooling?
-0
+1
 1
 -1000
 
@@ -939,7 +941,7 @@ diver.avoidance.w
 diver.avoidance.w
 -5
 100
-10
+-1
 1
 1
 NIL
@@ -969,7 +971,7 @@ approach.dist
 approach.dist
 0.5
 10
-1
+3
 0.1
 1
 meters
@@ -981,7 +983,7 @@ INPUTBOX
 255
 70
 species.name
-Schooling
+Large bold
 1
 0
 String
@@ -1081,7 +1083,7 @@ INPUTBOX
 165
 920
 B2.name
-feeding
+stationary
 1
 0
 String
@@ -1092,7 +1094,7 @@ INPUTBOX
 165
 980
 B3.name
-stationary
+n/a
 1
 0
 String
@@ -1236,7 +1238,7 @@ fish.size
 fish.size
 0.05
 1
-0.2
+0.3
 0.01
 1
 meters
@@ -1295,7 +1297,7 @@ visible.dist
 visible.dist
 0.5
 20
-4
+6
 0.5
 1
 meters
@@ -1321,7 +1323,7 @@ b1.freq
 b1.freq
 0
 1
-0.5
+0.6
 0.05
 1
 NIL
@@ -1336,7 +1338,7 @@ b2.freq
 b2.freq
 0
 1
-0.2
+0.4
 0.05
 1
 NIL
@@ -1351,7 +1353,7 @@ b3.freq
 b3.freq
 0
 1
-0.3
+0
 0.05
 1
 NIL
@@ -1820,7 +1822,7 @@ burst.speed
 burst.speed
 0
 10
-2.6
+2.2
 0.1
 1
 m/s
@@ -1880,7 +1882,7 @@ cruise.w
 cruise.w
 0
 10
-0
+10
 1
 1
 NIL
@@ -2121,12 +2123,12 @@ m
 HORIZONTAL
 
 BUTTON
-1065
-1005
-1140
-1038
+1030
+970
+1100
+1003
 Stop
-movie-close\nset recording FALSE
+set recording FALSE\nmovie-close\n
 NIL
 1
 T
@@ -2138,12 +2140,12 @@ NIL
 1
 
 BUTTON
-955
+950
 970
-1140
+1020
 1003
-Create new movie
-let movie.name user-input \"Pick a name for the movie file (exclude extension).\"\nmovie-start word movie.name \".mov\"\nmovie-set-frame-rate movement.time.step\nuser-message (word \"File \" movie.name \".mov created. Press record to start recording!\")
+Start
+let movie.name user-input \"Pick a name for the movie file (exclude extension).\"\nmovie-start word movie.name \".mov\"\nmovie-set-frame-rate movement.time.step\nuser-message (word \"File \" movie.name \".mov created. Press OK to start recording!\")\nset recording true
 NIL
 1
 T
@@ -2153,17 +2155,6 @@ NIL
 NIL
 NIL
 1
-
-SWITCH
-955
-1005
-1062
-1038
-Recording
-Recording
-1
-1
--1000
 
 TEXTBOX
 950
