@@ -297,8 +297,8 @@ to-report spacing-urge ; fish reporter
   let urge [ 0 0 ]
   ;; report the sum of the distances to fishes
   ;; in my school that are closer to me than
-  ;; cruise.distance (in body lengths)
-  ask schoolmates with [ distance myself < (cruise.distance * size) ] [
+  ;; schoolmate.dist (in body lengths)
+  ask schoolmates with [ distance myself < (schoolmate.dist * size) ] [
     set urge
       add
         urge
@@ -373,7 +373,7 @@ end
 
 to save.species.data
   if (b1.freq + b2.freq + b3.freq + b4.freq) != 1 [user-message "ERROR: Sum of behavior frequencies must be 1." stop] ;check if behavior frequencies add up to 1
-  set sp.param (list species.name "fish top" fish.size fish.color fish.density visible.dist approach.dist perception.dist perception.angle prey.type max.acceleration max.sustained.speed burst.speed length-surface drag-coefficient lw-a lw-b water-density)
+  set sp.param (list species.name "fish top" fish.size fish.color fish.density id.distance approach.dist perception.dist perception.angle prey.type max.acceleration max.sustained.speed burst.speed length-surface drag-coefficient lw-a lw-b water-density)
   if b1.freq = 0 [set b1.name "n/a" set b1.sp.param ["n/a" 0 0 false 0 0 0 0 0 0 0 0 0 0 0 0] ; check behaviors to see if any of them have freq 0 and fill them with zeros
     output-print "Behavior 1 saved as an empty slot."]
   if b2.freq = 0 [set b2.name "n/a" set b2.sp.param ["n/a" 0 0 false 0 0 0 0 0 0 0 0 0 0 0 0]
@@ -385,12 +385,12 @@ to save.species.data
   let behavior.param (sentence b1.sp.param b2.sp.param b3.sp.param b4.sp.param)
   let file.name word user-input "Choose name for the csv file. Any file with the same name will be overwritten." ".csv"
   (csv:to-file file.name (list (list
-      "Species" "shape" "size" "color" "density" "visible.dist" "approach.dist" "perception.dist" "perception.angle" "prey.type"
+      "Species" "shape" "size" "color" "density" "id.distance" "approach.dist" "perception.dist" "perception.angle" "prey.type"
       "max.acceleration" "max.sustained.speed" "burst.speed" "length-surface" "drag-coefficient" "lw-a" "lw-b" "water-density"
-      "B1.name" "B1.frequency" "B1.detectability" "B1.schooling?" "B1.cruise.distance" "B1.align.w" "B1.center.w" "B1.spacing.w" "B1.wander.w" "B1.rest.w" "B1.cruise.w" "B1.picked.patch.dist" "B1.patch.gathering.w" "B1.predator.avoidance.w" "B1.prey.chasing.w" "B1.diver.avoidance.w"
-      "B2.name" "B2.frequency" "B2.detectability" "B2.schooling?" "B2.cruise.distance" "B2.align.w" "B2.center.w" "B2.spacing.w" "B2.wander.w" "B2.rest.w" "B2.cruise.w" "B2.picked.patch.dist" "B2.patch.gathering.w" "B2.predator.avoidance.w" "B2.prey.chasing.w" "B2.diver.avoidance.w"
-      "B3.name" "B3.frequency" "B3.detectability" "B3.schooling?" "B3.cruise.distance" "B3.align.w" "B3.center.w" "B3.spacing.w" "B3.wander.w" "B3.rest.w" "B3.cruise.w" "B3.picked.patch.dist" "B3.patch.gathering.w" "B3.predator.avoidance.w" "B3.prey.chasing.w" "B3.diver.avoidance.w"
-      "B4.name" "B4.frequency" "B4.detectability" "B4.schooling?" "B4.cruise.distance" "B4.align.w" "B4.center.w" "B4.spacing.w" "B4.wander.w" "B4.rest.w" "B4.cruise.w" "B4.picked.patch.dist" "B4.patch.gathering.w" "B4.predator.avoidance.w" "B4.prey.chasing.w" "B4.diver.avoidance.w") sentence sp.param behavior.param) ",")
+      "B1.name" "B1.frequency" "B1.detectability" "B1.schooling?" "B1.schoolmate.dist" "B1.align.w" "B1.center.w" "B1.spacing.w" "B1.wander.w" "B1.rest.w" "B1.cruise.w" "B1.picked.patch.dist" "B1.patch.gathering.w" "B1.predator.avoidance.w" "B1.prey.chasing.w" "B1.diver.avoidance.w"
+      "B2.name" "B2.frequency" "B2.detectability" "B2.schooling?" "B2.schoolmate.dist" "B2.align.w" "B2.center.w" "B2.spacing.w" "B2.wander.w" "B2.rest.w" "B2.cruise.w" "B2.picked.patch.dist" "B2.patch.gathering.w" "B2.predator.avoidance.w" "B2.prey.chasing.w" "B2.diver.avoidance.w"
+      "B3.name" "B3.frequency" "B3.detectability" "B3.schooling?" "B3.schoolmate.dist" "B3.align.w" "B3.center.w" "B3.spacing.w" "B3.wander.w" "B3.rest.w" "B3.cruise.w" "B3.picked.patch.dist" "B3.patch.gathering.w" "B3.predator.avoidance.w" "B3.prey.chasing.w" "B3.diver.avoidance.w"
+      "B4.name" "B4.frequency" "B4.detectability" "B4.schooling?" "B4.schoolmate.dist" "B4.align.w" "B4.center.w" "B4.spacing.w" "B4.wander.w" "B4.rest.w" "B4.cruise.w" "B4.picked.patch.dist" "B4.patch.gathering.w" "B4.predator.avoidance.w" "B4.prey.chasing.w" "B4.diver.avoidance.w") sentence sp.param behavior.param) ",")
   output-print "Species data saved."
   file-close-all                                                                 ; prevents csv file from being impossible to delete after closing NetLogo (I think...)
   user-message (word "File " file.name " was created and can be found in the model folder.")
@@ -409,7 +409,7 @@ to load.species.data
   set fish.size item 2 params
   set fish.color item 3 params
   set fish.density item 4 params
-  set visible.dist item 5 params
+  set id.distance item 5 params
   set approach.dist item 6 params
   set perception.dist item 7 params
   set perception.angle item 8 params
@@ -443,7 +443,7 @@ to save.b1
   if b1.freq = 0 [set b1.name "n/a" set b1.sp.param ["n/a" 0 0 false 0 0 0 0 0 0 0 0 0 0 0 0]
     output-print "Behavior 1 saved as an empty slot."
     stop]
-  set b1.sp.param (list b1.name b1.freq detectability schooling? cruise.distance align.w center.w spacing.w wander.w rest.w cruise.w picked.patch.dist patch.gathering.w predator.avoidance.w prey.chasing.w diver.avoidance.w)
+  set b1.sp.param (list b1.name b1.freq detectability schooling? schoolmate.dist align.w center.w spacing.w wander.w rest.w cruise.w picked.patch.dist patch.gathering.w predator.avoidance.w prey.chasing.w diver.avoidance.w)
   set loaded.behavior b1.name
   output-print "Behavior 1 saved."
 end
@@ -452,7 +452,7 @@ to save.b2
   if b2.freq = 0 [set b2.name "n/a" set b2.sp.param ["n/a" 0 0 false 0 0 0 0 0 0 0 0 0 0 0 0]
     output-print "Behavior 2 saved as an empty slot."
     stop]
-  set b2.sp.param (list b2.name b2.freq detectability schooling? cruise.distance align.w center.w spacing.w wander.w rest.w cruise.w picked.patch.dist patch.gathering.w predator.avoidance.w prey.chasing.w diver.avoidance.w)
+  set b2.sp.param (list b2.name b2.freq detectability schooling? schoolmate.dist align.w center.w spacing.w wander.w rest.w cruise.w picked.patch.dist patch.gathering.w predator.avoidance.w prey.chasing.w diver.avoidance.w)
   set loaded.behavior b2.name
   output-print "Behavior 2 saved."
 end
@@ -461,7 +461,7 @@ to save.b3
   if b3.freq = 0 [set b3.name "n/a" set b3.sp.param ["n/a" 0 0 false 0 0 0 0 0 0 0 0 0 0 0 0]
     output-print "Behavior 3 saved as an empty slot."
     stop]
-  set b3.sp.param (list b3.name b3.freq detectability schooling? cruise.distance align.w center.w spacing.w wander.w rest.w cruise.w picked.patch.dist patch.gathering.w predator.avoidance.w prey.chasing.w diver.avoidance.w)
+  set b3.sp.param (list b3.name b3.freq detectability schooling? schoolmate.dist align.w center.w spacing.w wander.w rest.w cruise.w picked.patch.dist patch.gathering.w predator.avoidance.w prey.chasing.w diver.avoidance.w)
   set loaded.behavior b3.name
   output-print "Behavior 3 saved."
 end
@@ -470,7 +470,7 @@ to save.b4
   if b4.freq = 0 [set b4.name "n/a" set b4.sp.param ["n/a" 0 0 false 0 0 0 0 0 0 0 0 0 0 0 0]
     output-print "Behavior 4 saved as an empty slot."
     stop]
-  set b4.sp.param (list b4.name b4.freq detectability schooling? cruise.distance align.w center.w spacing.w wander.w rest.w cruise.w picked.patch.dist patch.gathering.w predator.avoidance.w prey.chasing.w diver.avoidance.w)
+  set b4.sp.param (list b4.name b4.freq detectability schooling? schoolmate.dist align.w center.w spacing.w wander.w rest.w cruise.w picked.patch.dist patch.gathering.w predator.avoidance.w prey.chasing.w diver.avoidance.w)
   set loaded.behavior b4.name
   output-print "Behavior 4 saved."
 end
@@ -484,7 +484,7 @@ to load.b1
   if b1.freq = 0 [output-print "Behavior slot 1 is empty." stop]
   set detectability item 2 b1.sp.param
   set schooling? item 3 b1.sp.param
-  set cruise.distance item 4 b1.sp.param
+  set schoolmate.dist item 4 b1.sp.param
   set align.w item 5 b1.sp.param
   set center.w item 6 b1.sp.param
   set spacing.w item 7 b1.sp.param
@@ -523,7 +523,7 @@ to load.b2
   if b2.freq = 0 [output-print "Behavior slot 2 is empty." stop]
   set detectability item 2 b2.sp.param
   set schooling? item 3 b2.sp.param
-  set cruise.distance item 4 b2.sp.param
+  set schoolmate.dist item 4 b2.sp.param
   set align.w item 5 b2.sp.param
   set center.w item 6 b2.sp.param
   set spacing.w item 7 b2.sp.param
@@ -562,7 +562,7 @@ to load.b3
   if b3.freq = 0 [output-print "Behavior slot 3 is empty." stop]
   set detectability item 2 b3.sp.param
   set schooling? item 3 b3.sp.param
-  set cruise.distance item 4 b3.sp.param
+  set schoolmate.dist item 4 b3.sp.param
   set align.w item 5 b3.sp.param
   set center.w item 6 b3.sp.param
   set spacing.w item 7 b3.sp.param
@@ -601,7 +601,7 @@ to load.b4
   if b4.freq = 0 [output-print "Behavior slot 4 is empty." stop]
   set detectability item 2 b4.sp.param
   set schooling? item 3 b4.sp.param
-  set cruise.distance item 4 b4.sp.param
+  set schoolmate.dist item 4 b4.sp.param
   set align.w item 5 b4.sp.param
   set center.w item 6 b4.sp.param
   set spacing.w item 7 b4.sp.param
@@ -648,7 +648,7 @@ to create-new-species
   set fish.size 0.3
   set fish.color 9.9
   set fish.density 0.3
-  set visible.dist 5
+  set id.distance 5
   set approach.dist 1.5
   set perception.dist 0.6
   set perception.angle 320
@@ -659,7 +659,7 @@ to create-new-species
   set aspect.ratio 3
   set detectability 1
   set schooling? true
-  set cruise.distance 1
+  set schoolmate.dist 1
   set align.w 10
   set center.w 5
   set spacing.w 20
@@ -716,7 +716,7 @@ fish.density
 fish.density
 0
 1
-0.1
+0.3
 0.01
 1
 fishes / m^2
@@ -731,7 +731,7 @@ perception.dist
 perception.dist
 0.05
 5
-0.7
+0.5
 0.05
 1
 meters
@@ -746,7 +746,7 @@ max.sustained.speed
 max.sustained.speed
 0
 10
-0.4
+0.3
 0.1
 1
 m/s
@@ -769,14 +769,14 @@ HORIZONTAL
 
 SLIDER
 20
-555
-210
-588
-cruise.distance
-cruise.distance
+550
+232
+583
+schoolmate.dist
+schoolmate.dist
 0.1
 10
-1
+4
 0.1
 1
 body lenghts
@@ -784,9 +784,9 @@ HORIZONTAL
 
 SLIDER
 20
-520
-210
-553
+515
+230
+548
 spacing.w
 spacing.w
 0
@@ -799,9 +799,9 @@ HORIZONTAL
 
 SLIDER
 20
-485
-210
-518
+480
+230
+513
 center.w
 center.w
 0
@@ -814,9 +814,9 @@ HORIZONTAL
 
 SLIDER
 20
-450
-210
-483
+445
+230
+478
 align.w
 align.w
 0
@@ -836,7 +836,7 @@ wander.w
 wander.w
 0
 10
-7
+3
 1
 1
 NIL
@@ -885,7 +885,7 @@ picked.patch.dist
 picked.patch.dist
 0
 10
-1
+0.5
 0.5
 1
 meters
@@ -900,7 +900,7 @@ predator.avoidance.w
 predator.avoidance.w
 -5
 100
-10
+4
 1
 1
 NIL
@@ -908,9 +908,9 @@ HORIZONTAL
 
 SWITCH
 20
-415
-210
-448
+410
+230
+443
 schooling?
 schooling?
 1
@@ -926,7 +926,7 @@ perception.angle
 perception.angle
 45
 360
-320
+360
 5
 1
 degrees
@@ -941,7 +941,7 @@ diver.avoidance.w
 diver.avoidance.w
 -5
 100
--1
+4
 1
 1
 NIL
@@ -956,7 +956,7 @@ patch.gathering.w
 patch.gathering.w
 0
 20
-0
+6
 1
 1
 NIL
@@ -971,7 +971,7 @@ approach.dist
 approach.dist
 0.5
 10
-3
+0.7
 0.1
 1
 meters
@@ -983,7 +983,7 @@ INPUTBOX
 255
 70
 species.name
-Large bold
+Cryptic
 1
 0
 String
@@ -1055,7 +1055,7 @@ INPUTBOX
 165
 860
 B1.name
-wandering
+guarding
 1
 0
 String
@@ -1083,7 +1083,7 @@ INPUTBOX
 165
 920
 B2.name
-stationary
+feeding
 1
 0
 String
@@ -1094,7 +1094,7 @@ INPUTBOX
 165
 980
 B3.name
-n/a
+nested
 1
 0
 String
@@ -1105,7 +1105,7 @@ INPUTBOX
 165
 1040
 B4.name
-n/a
+patrolling
 1
 0
 String
@@ -1238,7 +1238,7 @@ fish.size
 fish.size
 0.05
 1
-0.3
+0.1
 0.01
 1
 meters
@@ -1293,11 +1293,11 @@ SLIDER
 325
 255
 358
-visible.dist
-visible.dist
+id.distance
+id.distance
 0.5
 20
-6
+1
 0.5
 1
 meters
@@ -1323,7 +1323,7 @@ b1.freq
 b1.freq
 0
 1
-0.6
+0.25
 0.05
 1
 NIL
@@ -1338,7 +1338,7 @@ b2.freq
 b2.freq
 0
 1
-0.4
+0.2
 0.05
 1
 NIL
@@ -1353,7 +1353,7 @@ b3.freq
 b3.freq
 0
 1
-0
+0.1
 0.05
 1
 NIL
@@ -1368,7 +1368,7 @@ b4.freq
 b4.freq
 0
 1
-0
+0.45
 0.05
 1
 NIL
@@ -1404,7 +1404,7 @@ detectability
 detectability
 0
 1
-1
+0.6
 0.1
 1
 NIL
@@ -1589,7 +1589,7 @@ rest.w
 rest.w
 0
 20
-0
+2
 1
 1
 NIL
@@ -1822,7 +1822,7 @@ burst.speed
 burst.speed
 0
 10
-2.2
+1.1
 0.1
 1
 m/s
@@ -1882,7 +1882,7 @@ cruise.w
 cruise.w
 0
 10
-10
+0
 1
 1
 NIL
@@ -2201,57 +2201,17 @@ NIL
 1
 
 @#$#@#$#@
-## WHAT IS IT?
+##WHAT IS IT##
 
-This is a vector-based flocking model, based on Jon Klein's implementation of Craig Reynolds' Boids algorithm. Each bird is influenced by a series of urges. By assigning different weights to each urge, the birds exhibit different flocking behaviors.
+This model is used to create "species" of fish and export them as csv files to import into the FishCensus.nlogo model.
 
-## HOW IT WORKS
+## COPYRIGHT AND LICENSE
 
-Each bird has vectors for velocity and acceleration, that is, a velocity and acceleration in the x and y directions.  Each of these vectors is influenced by six urges, to be near the center of the flock, to have the same velocity as the rest of the flock, to keep spacing correct, to avoid colliding with obstacles, to be near to the center of a patch and to wander throughout the world.  Each of these factors affects the resulting velocity and acceleration; however, the sliders in the interface weight the amount that each has an effect.
+Copyright 2016 Miguel Pessanha Pais
 
-## HOW TO USE IT
+![CC BY-NC-SA 3.0](http://ccl.northwestern.edu/images/creativecommons/byncsa.png)
 
-Choose the number of birds with the POPULATION slider. Press SETUP to create the birds. Press GO to start the simulation.
-
-BUILD-CUBES randomly places floating-ball obstacles throughout the world. BUILD-WALL creates a randomly placed wall.
-
-VISION is the distance that a bird can see around it. MAX-VELOCITY is the fastest a bird can go and MAX-ACCELERATION is the fastest a bird can accelerate. CRUISE-DISTANCE is the minimum distance from a nearby bird for a bird to feel comfortable.
-
-A bird's movement is determined by the set of urges acting on that bird:
-
-CENTER-CONSTANT - urge to move towards the center of its flock
-VELOCITY-CONSTANT - urge to align its velocity with the velocity of her flockmates
-SPACING-CONSTANT - urge to be no closer than CRUISE-DISTANCE from other birds
-AVOIDANCE-CONSTANT - urge to avoid colliding with obstacles
-WORLD-CENTER-CONSTANT - urge to avoid the edges of the world
-WANDER-CONSTANT - urge to move in a random way
-
-The urge-constant sliders control the weight of each urge in determining the birds' behavior.
-
-## NETLOGO FEATURES
-
-This model uses lists and map fairly extensively to represent and manipulate vectors.
-
-## CREDITS AND REFERENCES
-
-This model is based on Jon Klein's "Swarm" demo for breve, (see http://www.spiderland.org/breve/) which was inspired by Craig Reynolds classic Boids flocking algorithm.
-
-## HOW TO CITE
-
-If you mention this model in an academic publication, we ask that you include these citations for the model itself and for the NetLogo software:
-- Wilensky, U. (2005).  NetLogo Flocking 3D Alternate model.  http://ccl.northwestern.edu/netlogo/models/Flocking3DAlternate.  Center for Connected Learning and Computer-Based Modeling, Northwestern University, Evanston, IL.
-- Wilensky, U. (1999). NetLogo. http://ccl.northwestern.edu/netlogo/. Center for Connected Learning and Computer-Based Modeling, Northwestern University, Evanston, IL.
-
-In other publications, please use:
-- Copyright 2005 Uri Wilensky. All rights reserved. See http://ccl.northwestern.edu/netlogo/models/Flocking3DAlternate for terms of use.
-
-## COPYRIGHT NOTICE
-
-Copyright 2005 Uri Wilensky. All rights reserved.
-
-Permission to use, modify or redistribute this model is hereby granted, provided that both of the following requirements are followed:
-a) this copyright notice is included.
-b) this model will not be redistributed for profit without permission from Uri Wilensky. Contact Uri Wilensky for appropriate licenses for redistribution for profit.
+This work is licensed under the Creative Commons Attribution-NonCommercial-ShareAlike 3.0 License.  To view a copy of this license, visit http://creativecommons.org/licenses/by-nc-sa/3.0/ or send a letter to Creative Commons, 559 Nathan Abbott Way, Stanford, California 94305, USA.
 @#$#@#$#@
 default
 true

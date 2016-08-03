@@ -54,9 +54,9 @@ fishes-own [                     ; fish variables
   acceleration                   ; vector with x and y components, determined by the sum of all urges
   species                        ; this separates the different types within the fish breed. This is the variable recorded by divers while counting
   prey.type                      ; "benthic" or "fish". Defines the type of feeding behavior (gather around a patch or chase prey)
-  detectability                  ; probability of being missed (if = 1 fish is always counted if within visible.dist)
+  detectability                  ; probability of being missed (if = 1 fish is always counted if within id.distance)
   visible?                       ; boolean variable that is set by detectability every second
-  visible.dist                   ; maximum distance from diver required to correctly identify the species
+  id.distance                   ; maximum distance from diver required to correctly identify the species
   approach.dist                  ; minimum distance from diver that the fish tolerate
   behavior.list                  ; list of up to 4 distinct behaviors
   behavior.freqs                 ; frequency of each behavior
@@ -72,7 +72,7 @@ fishes-own [                     ; fish variables
   diver.avoidance.w              ; weighs the urge to avoid divers. If negative, fish are attracted to divers
   predator.avoidance.w           ; weighs the urge to avoid fish with prey.type = "fish"
   prey.chasing.w                 ; weighs the urge to chase other fish
-  cruise.distance                ; distance among schoolmates in a school (in body lengths)
+  schoolmate.dist                ; distance among schoolmates in a school (in body lengths)
   align.w                        ; weighs the urge to match school direction
   center.w                       ; weighs the urge to stand between nearby schoolmates
   spacing.w                      ; weighs the urge to maintain crusing.distance from schoolmates
@@ -176,7 +176,7 @@ to setup
       ifelse item 17 sp.param = "Seawater - 1027 Kg/m3" [set wat.dens.value 1027] [set wat.dens.value 1000]
       set drag.formula ((0.5 * (item 14 sp.param) * wat.dens.value * (((item 13 sp.param) * ((size * 100) ^ 2)) * 0.0001))/(((item 15 sp.param) * ((size * 100) ^ (item 16 sp.param))) * 0.001))   ; formula to calculate k in order to calculate the deceleration due to drag in the form of a = kv^2 (v for velocity).
       set color item 3 sp.param
-      set visible.dist item 5 sp.param
+      set id.distance item 5 sp.param
       set approach.dist item 6 sp.param
       set perception.dist item 7 sp.param
       set perception.angle item 8 sp.param
@@ -541,7 +541,7 @@ to set.behavior                                                        ; fish pr
     let params item param.pos behavior.params                            ; retreive list of parameters from the correct position in behavior.params
     set detectability item 2 params
     set schooling? item 3 params
-    set cruise.distance item 4 params
+    set schoolmate.dist item 4 params
     set align.w item 5 params
     set center.w item 6 params
     set spacing.w item 7 params
@@ -564,7 +564,7 @@ to set.behavior                                                        ; fish pr
         set current.behavior [current.behavior] of myself
         set detectability item 2 params
         set schooling? item 3 params
-        set cruise.distance item 4 params
+        set schoolmate.dist item 4 params
         set align.w item 5 params
         set center.w item 6 params
         set spacing.w item 7 params
@@ -650,8 +650,8 @@ to-report spacing-urge ;; fish reporter
   let urge [ 0 0 ]
   ;; report the sum of the distances to fishes
   ;; in my school that are closer to me than
-  ;; cruise.distance (in body lengths)
-  ask schoolmates with [ distance myself < (cruise.distance * size) ] [
+  ;; schoolmate.dist (in body lengths)
+  ask schoolmates with [ distance myself < (schoolmate.dist * size) ] [
     set urge
       add
         urge
@@ -735,7 +735,7 @@ to d.count.fishes                      ; for fixed distance transects, there is 
   let my.final.ycor final.ycor
   let seen.fishes fishes in-cone max.visibility viewangle
   let eligible.fishes seen.fishes with [(xcor > myxcor - (distance.transect.width / 2)) and (xcor < myxcor + (distance.transect.width / 2)) and (ycor < my.final.ycor)]  ; distance transects have a limit in ycor as well
-  let identifiable.fishes eligible.fishes with [visible.dist >= distance myself and visible?]      ; only fish that within their visible.dist and are visible are counted
+  let identifiable.fishes eligible.fishes with [id.distance >= distance myself and visible?]      ; only fish that within their id.distance and are visible are counted
   let diver.memory memory
   let new.fishes (identifiable.fishes with [not member? who diver.memory]) ; only fishes that are not remembered are counted
   ifelse count new.fishes > count.saturation [                       ; even if there are more, only the max number of fishes per second is counted (count.saturation)
@@ -754,7 +754,7 @@ to t.count.fishes
   let myxcor xcor
   let seen.fishes fishes in-cone max.visibility viewangle
   let eligible.fishes seen.fishes with [(xcor >= myxcor - (timed.transect.width / 2)) and (xcor <= myxcor + (timed.transect.width / 2))]  ; this only works for transects heading north, of course
-  let identifiable.fishes eligible.fishes with [visible.dist >= distance myself and visible?]
+  let identifiable.fishes eligible.fishes with [id.distance >= distance myself and visible?]
   let diver.memory memory
   let new.fishes identifiable.fishes with [not member? who diver.memory] ; only fishes that are not remembered are counted
   ifelse count new.fishes > count.saturation [                       ; even if there are more, only the max number of fishes per second is counted (count.saturation)
@@ -771,7 +771,7 @@ end
 
 to s.count.fishes
   let eligible.fishes fishes in-cone stationary.radius viewangle
-  let identifiable.fishes eligible.fishes with [visible.dist >= distance myself and visible?]
+  let identifiable.fishes eligible.fishes with [id.distance >= distance myself and visible?]
   let diver.memory memory
   let new.fishes identifiable.fishes with [not member? who diver.memory] ; only fishes that are not remembered are counted
   ifelse count new.fishes > count.saturation [                       ; even if there are more, only the max number of fishes per second is counted (count.saturation)
@@ -788,7 +788,7 @@ end
 
 to r.count.fishes
   let eligible.fishes fishes in-cone max.visibility viewangle
-  let identifiable.fishes eligible.fishes with [visible.dist >= distance myself and visible?]
+  let identifiable.fishes eligible.fishes with [id.distance >= distance myself and visible?]
   let diver.memory memory
   let new.fishes identifiable.fishes with [not member? who diver.memory] ; only fishes that were not previously counted are counted
   ifelse count new.fishes > count.saturation [                       ; even if there are more, only the max number of fishes per second is counted (count.saturation)
@@ -1649,7 +1649,7 @@ INPUTBOX
 135
 220
 file.name
-cryptic 3
+schooling
 1
 0
 String
@@ -1706,152 +1706,21 @@ NIL
 1
 
 @#$#@#$#@
-## WHAT IS IT?
 
-This is a model that simulates divers counting sharks while deploying the belt-transect, stationary-point-count and roving underwater visual census techniques. The model demonstrates how non-instantaneous sampling techniques produce bias by overestimating the number of counted animals, when they move relative to the person counting them.
 
-This is applied to divers and sharks, but is intended to reflect what happens with many other animal censuses (aerial surveys, bird transects, etc.).
-
-The model can be used to demonstrate that bias increases as the speed of the animals relative to the observer increases.
-
-The model assumes an area that is featureless and flat, with a default size of 400x400 cells with an area of 1 square meter. The origin of the coordinate system is on the bottom left corner and depth is ignored (assumed constant).
-
-## HOW IT WORKS
-
-For each simulation, the divers start in the middle and face north. Sharks and transect divers move every second, but the time step for counting can be set to 2 seconds for smaller computing times (set by default on the original model, but note that some sharks may be missed, particularly if they are very fast).
-
-At each counting time step, divers count the number of sharks they can see based on the direction the diver is facing, the visibility distance and angle. Viewing angles are fixed and cannot be changed on the interface. They are set to 160º for the stationary and roving divers and 180º for the transect diver.
-
-On the belt-transect method, only fish within the transect width are counted, while on the stationary-point-count method, only fish within a pre-determined radius are counted.
-
-Transect diver moves in a fixed direction at a constant speed (default is 4 m/minute).
-
-Stationary diver rotates a given number of degrees clockwise every two seconds (default is 4).
-
-Sharks move at a speed specified by the user, and travel in a direction that is restricted by a turning angle based on the previous direction.
-
-Sharks and divers that reach the boundaries of the area wrap around to the opposite side, to keep the density constant (on the original model they can leave the area, but that doesn't seem to have significant effects on the output, if the area is large enough.
-
-By default, divers keep a memory of every individual shark counted and do not recount.
-
-## HOW TO USE IT
-
-In order to speed up model runs, please disable update view (at the top).
-
-The "setup" button feeds all parameter values into the model, places the selected divers and spreads all the sharks across the area.
-
-The "go" button runs the model for the time specified in survey.time (default is 300 seconds) and then stops. The model can be stopped or paused at any time by pressing the go button while it is running. The "go once" button avances the model run by 1 second each time.
-
-The "setup with default parameter values" button sets all parameters to values used in the first experiment by Ward-Paige et al. (2010) with shark speed set to 1 m/s. The model is automatically setup and you just need to press "go".
-
-"transect.width" sets the width of the belt transect that is sampled as the diver swims in the center (half of the width to each side of the diver).
-
-To set the initial number of sharks, introduce the total number of sharks directly under "numb.sharks" on the interface. Alternatively (and preferably), you can set the real density needed under "shark.density" and the model will place the right number of sharks for the total area. If shark.density is set to a value greater than 0 when the model starts, it has priority over "numb.sharks".
-
-Select the sampling methods that will be in the model run by turning their swiches on and off on the interface. Please note that the roving diver will not calculate densities and thus will not estimate bias. If you want to see the details of every diver in a floating window during the run, switch on "show.diver.detail.windows?".
-
-If you want the transect and roving divers to draw a path as they move, switch on "show.paths?".
-
-Stationary.radius must be set to a value lower than visibility.length.
-
-In the end of each run, each diver reports its relative bias, calculated as:
-
-(real count - expected count) / expected count
-
-where "expected count" is basically the shark density in the model multiplied by the total sampled area.
-
-For the stationary diver:
-
-sampled area = pi * stationary.radius^2
-
-For the transect diver:
-
-sampled area = survey.time * (transect.diver.speed / 60) * transect.width + visibility length * transect.width
-
-Notice that the final part of the transect is approximated to a rectangle of length equal to the visibility length, instead of taking into account the arc produced by the cone of vision. This was done in the original model and, With relatively large visibility lengths, does not seem to have much impact on the final result.
-
-The model will also output the conversion factor value for each method (transect and stationary). The real count (in the field) divided by this factor value should provide an estimate that is corrected to account for bias (given that all parameters are realistically set).
-
-## THINGS TO NOTICE
-
-If "view updates" is enabled, the model will run in real time (every second in the model will run in one second).
-
-To understand the source of the bias, compare a model wun with shark.mean.speed set to 0 m/s (stationary sharks) and another with shark.mean.speed set to 1 m/s. Keep everything else default.
-
-In the first case (stationary sharks), the sampling method will be equivalent to taking a snapshot of the whole sampling area. The sharks will stand still and the diver will count every shark in the sampling area, not repeating any shark (given that "diver.memory?" is switched on). This will produce little to no bias in the estimates.
-
-In the case where sharks move 1 meter every second (while the diver is moving 4 meters every minute), there will be new sharks comming into the sampling area that were not there in the beginning. These sharks will all be counted as they pass in front of the diver, increasing the number of counted sharks, while the real number of sharks in the beginning was much lower. This produces the bias.
-
-If the speed of the sharks is even higher, there are more sharks coming into the field of view of the diver and the bias will be even higher.
-
-## THINGS TO TRY
-
-- Switch on just the transect diver and see how increasing shark speeds increases bias. Why does this happen?
-
-- Do the same for the stationary diver. The results are similar, why?
-
-- With stationary sharks (speed 0) and moving divers, bias is almost zero, but what about stationary divers with moving sharks? Place a stationary diver with stationary.turning.angle set to 0 and sharks with speed > 0 and see the results.
-
-- Run a model in real time (normal speed and "view updates" checked) with the default parameters. While it is running, press the follow button in front of the transect diver switch to focus the view on that diver. Now head to the top right corner of the world window and click "3D" to go to the 3D view. Observing the diver from this perspective as it counts sharks is a great way of understanding the bias in non-instantaneous sampling of moving animals.
-
-- Going to tools -> behaviorSpace, you can see there are 2 experiments created that correspond to the experiments run by Ward-Paige et al. (2010). One to observe the increase in bias with increasing shark speed (30 replicates per run) and one to test every combination of values from a set of realistic candidates (a single run per combination) and observe the resulting bias (prepare for long computing times with this one).
-
-## USING THE BIAS CALCULATOR
-
-The model can be used as a tool to get better estimates from field surveys using the bias calculator at the bottom.
-
-To make corrections to observed values (values observed in the field by non-instantaneous surveys):
-
-1. Decide on targeted fish species and select an appropriate speed and turning angle for that species.
-2. Select most appropriate sampling values (e.g. transect width, swim speed, survey time, etc.) Note: for visibility, select the distance you would be sure to detect the targeted fish.
-4. Run the model with the selected parameters, making sure that the your sampling method of choice is turned on in the switches.
-5. After the survey time finishes the model stops and the conversion factor is calculated.
-6. On the calculator, go to the "observed.value" box and input the number of fish from that species you counted in the field
-7. Select the appropriate method on the calculator (transect or stationary)
-8. Press calculate. The result is the "real" count, corrected for bias.
-5. Repeat for other species.
-
-## NOTES ON THE ADAPTATION TO NETLOGO
-
-On the original model, the sharks could leave the area and come back (or leave permanently). Here the world is set to wrap around the edges. For an area that is large enough, this does not seem to affect the final results. In order to reflect what was made in the original model in R, one can set a buffer area around where no sharks are placed. If for some reason we want sharks to leave and never come back, we can just make them die when they reach the edges.
-
-The sharks in NetLogo have a visual representation, unlike in R, where they where just points. However, in the counting procedure in this NetLogo version, only the coordinates of the sharks are checked to see if they are counted, so their size is basically ignored and does not influence results.
 
 ## RELATED MODELS
 
-The orignial AnimDens model was implemented in R by Christine Ward-Paige, Joanna Mills Flemming and Heike K. Lotze. The code can be downloaded at:
+AnimDens model was implemented in R by Christine Ward-Paige, Joanna Mills Flemming and Heike K. Lotze. The code can be downloaded at:
 
 http://journals.plos.org/plosone/article/asset?unique&id=info:doi/10.1371/journal.pone.0011722.s001
 
 ## CREDITS AND REFERENCES
 
-Original model by Christine Ward-Paige (2009)
-
-Implemented in NetLogo by Miguel Pessanha Pais (2015)
-
-If you use this model, please cite the original publication:
-
-Ward-Paige, C.A., Flemming, J.M., Lotze, H.K., 2010. Overestimating Fish Counts by Non-Instantaneous Visual Censuses: Consequences for Population and Community Descriptions. PLoS ONE 5(7): e11722. doi:10.1371/journal.pone.0011722
-
-URL: http://journals.plos.org/plosone/article?id=10.1371/journal.pone.0011722
-
-Another publication that uses the roving diver:
-
-Ward-Paige, C.A., Lotze, H.K., 2011. Assessing the Value of Recreational Divers for Censusing Elasmobranchs. PLoS ONE 6(10): e25609. doi:10.1371/journal.pone.0025609
-
-URL: http://journals.plos.org/plosone/article?id=10.1371/journal.pone.0025609
-
-In order to cite the NetLogo implementation:
-
-Pais, M.P., Ward-Paige, C.A. (2015). AnimDens model NetLogo implementation. http://modelingcommons.org/model/
-
-In order to cite the NetLogo software:
-
-Wilensky, U. (1999). NetLogo. http://ccl.northwestern.edu/netlogo/. Center for Connected Learning and Computer-Based Modeling, Northwestern Institute on Complex Systems, Northwestern University, Evanston, IL.
 
 ## COPYRIGHT AND LICENSE
 
-Copyright 2015 Miguel Pessanha Pais and Christine Ward-Paige.
+Copyright 2016 Miguel Pessanha Pais
 
 ![CC BY-NC-SA 3.0](http://ccl.northwestern.edu/images/creativecommons/byncsa.png)
 
