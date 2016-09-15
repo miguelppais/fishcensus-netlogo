@@ -709,14 +709,14 @@ seconds
 
 SLIDER
 260
-10
+60
 525
-43
+93
 fish.density
 fish.density
 0
 1
-0.3
+0.2
 0.01
 1
 fishes / m^2
@@ -724,14 +724,14 @@ HORIZONTAL
 
 SLIDER
 15
-85
+135
 255
-118
+168
 perception.dist
 perception.dist
 0.05
 5
-0.5
+0.6
 0.05
 1
 meters
@@ -739,14 +739,14 @@ HORIZONTAL
 
 SLIDER
 15
-195
+245
 207
-228
+278
 max.sustained.speed
 max.sustained.speed
 0
 10
-0.3
+0.5
 0.1
 1
 m/s
@@ -754,14 +754,14 @@ HORIZONTAL
 
 SLIDER
 15
-290
+340
 255
-323
+373
 max.acceleration
 max.acceleration
 0
 2
-0.1
+0.15
 0.05
 1
 m/s^2
@@ -769,14 +769,14 @@ HORIZONTAL
 
 SLIDER
 20
-550
+600
 232
-583
+633
 schoolmate.dist
 schoolmate.dist
 0.1
 10
-4
+1.5
 0.1
 1
 body lenghts
@@ -784,14 +784,14 @@ HORIZONTAL
 
 SLIDER
 20
-515
+565
 230
-548
+598
 spacing.w
 spacing.w
 0
 50
-0
+5
 1
 1
 NIL
@@ -799,14 +799,14 @@ HORIZONTAL
 
 SLIDER
 20
-480
+530
 230
-513
+563
 center.w
 center.w
 0
 20
-0
+5
 1
 1
 NIL
@@ -814,14 +814,14 @@ HORIZONTAL
 
 SLIDER
 20
-445
+495
 230
-478
+528
 align.w
 align.w
 0
 20
-0
+5
 1
 1
 NIL
@@ -829,14 +829,14 @@ HORIZONTAL
 
 SLIDER
 265
-445
+495
 437
-478
+528
 wander.w
 wander.w
 0
 10
-3
+5
 1
 1
 NIL
@@ -844,9 +844,9 @@ HORIZONTAL
 
 BUTTON
 260
-253
+365
 390
-313
+410
 NIL
 setup
 NIL
@@ -861,9 +861,9 @@ NIL
 
 BUTTON
 395
-253
+365
 525
-313
+410
 NIL
 go
 T
@@ -878,14 +878,14 @@ NIL
 
 SLIDER
 265
-610
+660
 440
-643
+693
 picked.patch.dist
 picked.patch.dist
 0
 10
-0.5
+1
 0.5
 1
 meters
@@ -893,14 +893,14 @@ HORIZONTAL
 
 SLIDER
 20
-615
+665
 190
-648
+698
 predator.avoidance.w
 predator.avoidance.w
 -5
 100
-4
+5
 1
 1
 NIL
@@ -908,25 +908,25 @@ HORIZONTAL
 
 SWITCH
 20
-410
+460
 230
-443
+493
 schooling?
 schooling?
-1
+0
 1
 -1000
 
 SLIDER
 15
-120
+170
 255
-153
+203
 perception.angle
 perception.angle
 45
 360
-360
+320
 5
 1
 degrees
@@ -934,14 +934,14 @@ HORIZONTAL
 
 SLIDER
 20
-650
+700
 190
-683
+733
 diver.avoidance.w
 diver.avoidance.w
 -5
 100
-4
+5
 1
 1
 NIL
@@ -949,14 +949,14 @@ HORIZONTAL
 
 SLIDER
 265
-650
+700
 440
-683
+733
 patch.gathering.w
 patch.gathering.w
 0
 20
-6
+0
 1
 1
 NIL
@@ -964,14 +964,14 @@ HORIZONTAL
 
 SLIDER
 15
-155
+205
 255
-188
+238
 approach.dist
 approach.dist
 0.5
 10
-0.7
+1
 0.1
 1
 meters
@@ -979,20 +979,20 @@ HORIZONTAL
 
 INPUTBOX
 15
-10
+60
 255
-70
+120
 species.name
-Cryptic
+schoolmate 1.5
 1
 0
 String
 
 SWITCH
 1145
-515
+475
 1390
-548
+508
 smooth.animation?
 smooth.animation?
 0
@@ -1001,9 +1001,9 @@ smooth.animation?
 
 TEXTBOX
 20
-390
+440
 170
-408
+458
 Schooling parameters
 11
 0.0
@@ -1011,9 +1011,9 @@ Schooling parameters
 
 TEXTBOX
 20
-595
+645
 170
-613
+663
 Avoidance urges
 11
 0.0
@@ -1021,9 +1021,9 @@ Avoidance urges
 
 TEXTBOX
 15
-70
+120
 165
-88
+138
 Fixed species parameters
 11
 0.0
@@ -1031,9 +1031,9 @@ Fixed species parameters
 
 TEXTBOX
 265
-390
+440
 415
-408
+458
 Individual movement
 11
 0.0
@@ -1041,9 +1041,9 @@ Individual movement
 
 TEXTBOX
 265
-590
+640
 415
-608
+658
 Gathering parameters
 11
 0.0
@@ -1051,20 +1051,20 @@ Gathering parameters
 
 INPUTBOX
 20
-800
+850
 165
-860
+910
 B1.name
-guarding
+test behaviour
 1
 0
 String
 
 BUTTON
 265
-800
+850
 340
-860
+910
 Save as B1
 save.b1
 NIL
@@ -1079,42 +1079,42 @@ NIL
 
 INPUTBOX
 20
-860
+910
 165
-920
+970
 B2.name
-feeding
+n/a
 1
 0
 String
 
 INPUTBOX
 20
-920
+970
 165
-980
+1030
 B3.name
-nested
+n/a
 1
 0
 String
 
 INPUTBOX
 20
-980
+1030
 165
-1040
+1090
 B4.name
-patrolling
+n/a
 1
 0
 String
 
 BUTTON
 265
-860
+910
 340
-920
+970
 Save as B2
 save.b2
 NIL
@@ -1129,9 +1129,9 @@ NIL
 
 BUTTON
 265
-920
+970
 340
-980
+1030
 Save as B3
 save.b3
 NIL
@@ -1146,9 +1146,9 @@ NIL
 
 BUTTON
 265
-980
+1030
 340
-1040
+1090
 Save as B4
 save.b4
 NIL
@@ -1163,9 +1163,9 @@ NIL
 
 BUTTON
 340
-800
+850
 410
-860
+910
 Load B1
 load.b1
 NIL
@@ -1180,9 +1180,9 @@ NIL
 
 BUTTON
 340
-860
+910
 410
-920
+970
 Load B2
 load.b2
 NIL
@@ -1197,9 +1197,9 @@ NIL
 
 BUTTON
 340
-920
+970
 410
-980
+1030
 Load B3
 load.b3
 NIL
@@ -1214,9 +1214,9 @@ NIL
 
 BUTTON
 340
-980
+1030
 410
-1040
+1090
 Load B4
 load.b4
 NIL
@@ -1231,14 +1231,14 @@ NIL
 
 SLIDER
 260
-45
+95
 525
-78
+128
 fish.size
 fish.size
 0.05
 1
-0.1
+0.3
 0.01
 1
 meters
@@ -1246,19 +1246,19 @@ HORIZONTAL
 
 CHOOSER
 260
-80
+130
 445
-125
+175
 fish.color
 fish.color
 8 9.9 18 28 38 48 58 68 88 128 138
-1
+6
 
 BUTTON
 20
-1045
+1095
 410
-1090
+1140
 Save species data to file
 save.species.data
 NIL
@@ -1273,9 +1273,9 @@ NIL
 
 BUTTON
 20
-1095
+1145
 410
-1140
+1190
 Load species data from file
 load.species.data
 NIL
@@ -1290,14 +1290,14 @@ NIL
 
 SLIDER
 15
-325
+375
 255
-358
+408
 id.distance
 id.distance
 0.5
 20
-1
+5
 0.5
 1
 meters
@@ -1305,9 +1305,9 @@ HORIZONTAL
 
 MONITOR
 260
-315
+10
 525
-360
+55
 Nr. fishes
 count fishes
 0
@@ -1316,14 +1316,14 @@ count fishes
 
 SLIDER
 165
-825
+875
 265
-858
+908
 b1.freq
 b1.freq
 0
 1
-0.25
+1
 0.05
 1
 NIL
@@ -1331,14 +1331,14 @@ HORIZONTAL
 
 SLIDER
 165
-885
+935
 265
-918
+968
 b2.freq
 b2.freq
 0
 1
-0.2
+0
 0.05
 1
 NIL
@@ -1346,14 +1346,14 @@ HORIZONTAL
 
 SLIDER
 165
-945
+995
 265
-978
+1028
 b3.freq
 b3.freq
 0
 1
-0.1
+0
 0.05
 1
 NIL
@@ -1361,14 +1361,14 @@ HORIZONTAL
 
 SLIDER
 165
-1005
+1055
 265
-1038
+1088
 b4.freq
 b4.freq
 0
 1
-0.45
+0
 0.05
 1
 NIL
@@ -1376,9 +1376,9 @@ HORIZONTAL
 
 MONITOR
 20
-750
+800
 265
-795
+845
 Sum of frequencies (must be 1)
 b1.freq + b2.freq + b3.freq + b4.freq
 2
@@ -1387,9 +1387,9 @@ b1.freq + b2.freq + b3.freq + b4.freq
 
 CHOOSER
 260
-130
+180
 525
-175
+225
 prey.type
 prey.type
 "benthic" "fish"
@@ -1397,14 +1397,14 @@ prey.type
 
 SLIDER
 265
-410
+460
 437
-443
+493
 detectability
 detectability
 0
 1
-0.6
+1
 0.1
 1
 NIL
@@ -1412,19 +1412,19 @@ HORIZONTAL
 
 TEXTBOX
 20
-370
+420
 520
-388
+438
 BEHAVIOR PARAMETERS______________________________________________________________
 11
 0.0
 1
 
 MONITOR
+20
+750
 265
-690
-440
-735
+795
 Current behavior
 loaded.behavior
 17
@@ -1433,14 +1433,14 @@ loaded.behavior
 
 SLIDER
 265
-550
+600
 437
-583
+633
 prey.chasing.w
 prey.chasing.w
 0
 50
-0
+5
 1
 1
 NIL
@@ -1448,9 +1448,9 @@ HORIZONTAL
 
 TEXTBOX
 270
-750
+800
 425
-791
+841
 To save an empty behavior, simply set frequency to 0 and save.
 11
 0.0
@@ -1458,9 +1458,9 @@ To save an empty behavior, simply set frequency to 0 and save.
 
 BUTTON
 440
-650
+700
 515
-683
+733
 Pick patch
 pick.patch
 NIL
@@ -1474,10 +1474,10 @@ NIL
 1
 
 OUTPUT
-1145
-405
-1390
-480
+725
+950
+1140
+1040
 11
 
 TEXTBOX
@@ -1582,14 +1582,14 @@ HORIZONTAL
 
 SLIDER
 265
-480
+530
 437
-513
+563
 rest.w
 rest.w
 0
 20
-2
+0
 1
 1
 NIL
@@ -1613,20 +1613,20 @@ NIL
 1
 
 TEXTBOX
-1155
+1400
+345
+1620
 375
-1375
-405
 Divers move forward at a constant speed of 8m per minute.
 11
 0.0
 1
 
 BUTTON
-1145
-480
-1390
-513
+725
+1040
+1140
+1073
 Clear output
 clear-output
 NIL
@@ -1641,9 +1641,9 @@ NIL
 
 BUTTON
 1145
-670
+540
 1390
-703
+573
 Focus on random fish
 let chosen-one one-of fishes\nfollow chosen-one\ninspect chosen-one
 NIL
@@ -1658,9 +1658,9 @@ NIL
 
 BUTTON
 1145
-740
+610
 1390
-773
+643
 Reset perspective
 reset-perspective
 NIL
@@ -1675,9 +1675,9 @@ NIL
 
 CHOOSER
 1145
-550
+390
 1390
-595
+435
 movement.time.step
 movement.time.step
 5 10
@@ -1685,9 +1685,9 @@ movement.time.step
 
 MONITOR
 205
-190
+240
 255
-235
+285
 L/s
 max.sustained.speed / fish.size
 2
@@ -1696,9 +1696,9 @@ max.sustained.speed / fish.size
 
 BUTTON
 335
-180
+230
 525
-216
+266
 Estimate speeds
 estimate-speeds
 NIL
@@ -1713,20 +1713,20 @@ NIL
 
 INPUTBOX
 260
-180
+230
 335
-240
+290
 aspect.ratio
-1.61389
+3
 1
 0
 Number
 
 TEXTBOX
 345
-220
+270
 525
-255
+305
 from caudal fin aspect ratio and body length.
 11
 0.0
@@ -1784,20 +1784,20 @@ NIL
 1
 
 TEXTBOX
-1169
-573
-1274
-591
+1167
+413
+1272
+431
 decisions per second
 11
 0.0
 1
 
 TEXTBOX
-1150
-600
-1385
-630
+1400
+400
+1635
+430
 Number of speed and heading decisions each fish makes in a second.
 11
 0.0
@@ -1805,24 +1805,24 @@ Number of speed and heading decisions each fish makes in a second.
 
 TEXTBOX
 1150
-630
+440
 1400
-660
-Match model frame rate in model settings to this value so that normal speed equals real time.
+470
+Match model frame rate in model settings to this value so that normal speed equals real time!
 11
 15.0
 1
 
 SLIDER
 15
-245
+295
 205
-278
+328
 burst.speed
 burst.speed
 0
 10
-1.1
+2.9
 0.1
 1
 m/s
@@ -1830,9 +1830,9 @@ HORIZONTAL
 
 MONITOR
 205
-240
+290
 255
-285
+335
 L/s
 burst.speed / fish.size
 1
@@ -1840,10 +1840,10 @@ burst.speed / fish.size
 11
 
 BUTTON
-1145
-785
-1390
-860
+15
+10
+255
+55
 Create new species
 create-new-species
 NIL
@@ -1858,9 +1858,9 @@ NIL
 
 BUTTON
 1145
-705
+575
 1390
-738
+608
 Focus on a diver
 if any? divers [\nlet chosen-diver one-of divers\nfollow chosen-diver\ninspect chosen-diver\n]
 NIL
@@ -1875,14 +1875,14 @@ NIL
 
 SLIDER
 265
-515
+565
 437
-548
+598
 cruise.w
 cruise.w
 0
 10
-0
+5
 1
 1
 NIL
@@ -1890,9 +1890,9 @@ HORIZONTAL
 
 CHOOSER
 415
-1095
+1145
 507
-1140
+1190
 csv.delimiter
 csv.delimiter
 "," ";"
@@ -1900,19 +1900,19 @@ csv.delimiter
 
 TEXTBOX
 1150
-870
+755
 1390
-888
-DRAG FORCE PARAMETERS (change is optional)
+773
+DRAG FORCE PARAMETERS
 11
 0.0
 1
 
 INPUTBOX
 1190
-890
+785
 1285
-950
+845
 length-surface
 0.4
 1
@@ -1921,9 +1921,9 @@ Number
 
 TEXTBOX
 1290
-920
+815
 1365
-938
+833
 * length^2
 11
 0.0
@@ -1931,9 +1931,9 @@ TEXTBOX
 
 TEXTBOX
 1150
-905
+800
 1195
-935
+830
 Surface area =
 11
 0.0
@@ -1941,9 +1941,9 @@ Surface area =
 
 INPUTBOX
 1190
-950
+845
 1285
-1010
+905
 drag-coefficient
 0.011
 1
@@ -1952,9 +1952,9 @@ Number
 
 TEXTBOX
 1155
-1015
+910
 1330
-1033
+928
 length-weight (W = a * L^b)
 11
 0.0
@@ -1962,9 +1962,9 @@ length-weight (W = a * L^b)
 
 INPUTBOX
 1155
-1035
+930
 1235
-1095
+990
 lw-a
 0.01989
 1
@@ -1973,9 +1973,9 @@ Number
 
 INPUTBOX
 1235
-1035
+930
 1310
-1095
+990
 lw-b
 2.8571
 1
@@ -1984,9 +1984,9 @@ Number
 
 TEXTBOX
 1315
-1065
+960
 1465
-1083
+978
 in g and cm
 11
 0.0
@@ -1994,9 +1994,9 @@ in g and cm
 
 BUTTON
 1285
-950
+845
 1390
-1010
+905
 defaults
 set length-surface 0.4\nset drag-coefficient 0.011\nset lw-a 0.01989\nset lw-b 2.8571\nset water-density \"Seawater - 1027 Kg/m3\"
 NIL
@@ -2011,9 +2011,9 @@ NIL
 
 CHOOSER
 1155
-1100
+995
 1395
-1145
+1040
 water-density
 water-density
 "Seawater - 1027 Kg/m3" "Freshwater - 1000 Kg/m3"
@@ -2021,9 +2021,9 @@ water-density
 
 TEXTBOX
 1290
-895
+790
 1400
-913
+808
 in g and cm2\n
 11
 0.0
@@ -2031,9 +2031,9 @@ in g and cm2\n
 
 BUTTON
 445
-80
+130
 525
-125
+175
 paint fishes
 ask fishes [set color fish.color]
 NIL
@@ -2048,19 +2048,19 @@ NIL
 
 TEXTBOX
 195
-630
+680
 250
-670
+720
 set to negative if attracted
 11
 15.0
 1
 
 BUTTON
-20
-690
-132
-735
+1145
+650
+1265
+695
 Draw fish path
 ask fishes [pen-down]
 NIL
@@ -2074,10 +2074,10 @@ NIL
 1
 
 BUTTON
-140
-690
-245
-735
+1270
+650
+1390
+695
 Stop drawing
 ask fishes [pen-up]\nclear-drawing
 NIL
@@ -2096,7 +2096,7 @@ BUTTON
 720
 1000
 Calculate average school size
-if not schooling? [print \"Schooling is disabled\" stop]\nset schoolmate-counts []\nask fishes with [count other fishes in-radius school.size.reference.radius > 1] [\nset schoolmate-counts lput (count other fishes in-radius school.size.reference.radius) schoolmate-counts\n]\noutput-print (word \"Average school size is \" precision (mean schoolmate-counts) 0 \" +/- \" precision (standard-deviation schoolmate-counts) 0)
+if not schooling? [output-print \"Schooling is disabled\" stop]\nset schoolmate-counts []\nask fishes with [count other fishes in-radius school.size.reference.radius > 1] [\nset schoolmate-counts lput (count other fishes in-radius school.size.reference.radius) schoolmate-counts\n]\noutput-print (word \"Average school size is \" precision (mean schoolmate-counts) 0 \" +/- \" precision (standard-deviation schoolmate-counts) 0)
 NIL
 1
 T
@@ -2123,11 +2123,11 @@ m
 HORIZONTAL
 
 BUTTON
-1030
-970
-1100
-1003
-Stop
+470
+310
+525
+350
+STOP
 set recording FALSE\nmovie-close\n
 NIL
 1
@@ -2140,11 +2140,11 @@ NIL
 1
 
 BUTTON
-950
-970
-1020
-1003
-Start
+415
+310
+470
+350
+REC
 let movie.name user-input \"Pick a name for the movie file (exclude extension).\"\nmovie-start word movie.name \".mov\"\nmovie-set-frame-rate movement.time.step\nuser-message (word \"File \" movie.name \".mov created. Press OK to start recording!\")\nset recording true
 NIL
 1
@@ -2157,20 +2157,20 @@ NIL
 1
 
 TEXTBOX
-950
-950
-1100
-968
+310
+325
+415
+343
 VIDEO RECORDER
 12
-0.0
+15.0
 1
 
 BUTTON
-440
-410
-530
-480
+1145
+700
+1265
+740
 Show speeds
 ask fishes [set label precision (magnitude velocity) 2]
 T
@@ -2184,10 +2184,10 @@ NIL
 1
 
 BUTTON
-440
-480
-530
-513
+1270
+700
+1390
+740
 Clear labels
 ask fishes [set label \"\"]
 NIL
@@ -2198,6 +2198,36 @@ NIL
 NIL
 NIL
 NIL
+1
+
+TEXTBOX
+1150
+520
+1300
+538
+PERSPECTIVE
+11
+0.0
+1
+
+TEXTBOX
+1400
+475
+1635
+510
+on: update view every movement.time.step\noff: update view every second
+11
+0.0
+1
+
+TEXTBOX
+1395
+870
+1545
+896
+Default values are for the Atlantic Cod
+11
+0.0
 1
 
 @#$#@#$#@
