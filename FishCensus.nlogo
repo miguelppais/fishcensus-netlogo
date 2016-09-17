@@ -1583,7 +1583,7 @@ INPUTBOX
 310
 70
 override.density
-0.3
+0.2
 1
 0
 Number
@@ -3459,6 +3459,76 @@ NetLogo 5.3.1
     </enumeratedValueSet>
     <enumeratedValueSet variable="count.saturation">
       <value value="3"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="sensitivity" repetitions="10" runMetricsEveryStep="true">
+    <setup>setup</setup>
+    <go>go</go>
+    <enumeratedValueSet variable="smooth.animation?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="movement.time.step">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="stationary.turning.angle">
+      <value value="4"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="file.name">
+      <value value="&quot;schooling&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="sampling.method">
+      <value value="&quot;Fixed distance transect&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="distance.transect.diver.speed">
+      <value value="8"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="fixed.seed?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="file.delimiter">
+      <value value="&quot;,&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="transect.distance">
+      <value value="30"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="behavior.change.interval">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="timed.transect.diver.speed">
+      <value value="8"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="buddy?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="max.visibility">
+      <value value="7"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="timed.transect.width">
+      <value value="2"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="show.diver.detail.window?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="override.density">
+      <value value="0.2"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="roving.time">
+      <value value="2"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="count.saturation">
+      <value value="3"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="distance.transect.width">
+      <value value="2"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="roving.diver.turning.angle">
+      <value value="20"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="show.paths?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="super.memory?">
+      <value value="false"/>
     </enumeratedValueSet>
   </experiment>
 </experiments>

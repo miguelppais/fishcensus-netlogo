@@ -709,14 +709,14 @@ seconds
 
 SLIDER
 260
-60
+110
 525
-93
+143
 fish.density
 fish.density
 0
 1
-0.2
+0.3
 0.01
 1
 fishes / m^2
@@ -776,7 +776,7 @@ schoolmate.dist
 schoolmate.dist
 0.1
 10
-1.5
+1
 0.1
 1
 body lenghts
@@ -791,7 +791,7 @@ spacing.w
 spacing.w
 0
 50
-5
+20
 1
 1
 NIL
@@ -821,22 +821,22 @@ align.w
 align.w
 0
 20
-5
+10
 1
 1
 NIL
 HORIZONTAL
 
 SLIDER
-265
+250
 495
-437
+422
 528
 wander.w
 wander.w
 0
 10
-5
+8
 1
 1
 NIL
@@ -877,9 +877,9 @@ NIL
 1
 
 SLIDER
-265
+250
 660
-440
+425
 693
 picked.patch.dist
 picked.patch.dist
@@ -900,7 +900,7 @@ predator.avoidance.w
 predator.avoidance.w
 -5
 100
-5
+100
 1
 1
 NIL
@@ -941,16 +941,16 @@ diver.avoidance.w
 diver.avoidance.w
 -5
 100
-5
+10
 1
 1
 NIL
 HORIZONTAL
 
 SLIDER
-265
+250
 700
-440
+425
 733
 patch.gathering.w
 patch.gathering.w
@@ -971,7 +971,7 @@ approach.dist
 approach.dist
 0.5
 10
-1
+1.5
 0.1
 1
 meters
@@ -983,7 +983,7 @@ INPUTBOX
 255
 120
 species.name
-schoolmate 1.5
+new species
 1
 0
 String
@@ -1030,9 +1030,9 @@ Fixed species parameters
 1
 
 TEXTBOX
-265
+250
 440
-415
+400
 458
 Individual movement
 11
@@ -1040,9 +1040,9 @@ Individual movement
 1
 
 TEXTBOX
-265
+250
 640
-415
+400
 658
 Gathering parameters
 11
@@ -1055,7 +1055,7 @@ INPUTBOX
 165
 910
 B1.name
-test behaviour
+n/a
 1
 0
 String
@@ -1231,9 +1231,9 @@ NIL
 
 SLIDER
 260
-95
+145
 525
-128
+178
 fish.size
 fish.size
 0.05
@@ -1246,13 +1246,13 @@ HORIZONTAL
 
 CHOOSER
 260
-130
+180
 445
-175
+225
 fish.color
 fish.color
 8 9.9 18 28 38 48 58 68 88 128 138
-6
+1
 
 BUTTON
 20
@@ -1272,10 +1272,10 @@ NIL
 1
 
 BUTTON
-20
-1145
-410
-1190
+260
+10
+525
+55
 Load species data from file
 load.species.data
 NIL
@@ -1305,9 +1305,9 @@ HORIZONTAL
 
 MONITOR
 260
-10
-525
-55
+60
+415
+105
 Nr. fishes
 count fishes
 0
@@ -1323,7 +1323,7 @@ b1.freq
 b1.freq
 0
 1
-1
+0
 0.05
 1
 NIL
@@ -1387,18 +1387,18 @@ b1.freq + b2.freq + b3.freq + b4.freq
 
 CHOOSER
 260
-180
+230
 525
-225
+275
 prey.type
 prey.type
 "benthic" "fish"
 0
 
 SLIDER
-265
+250
 460
-437
+422
 493
 detectability
 detectability
@@ -1432,15 +1432,15 @@ loaded.behavior
 11
 
 SLIDER
-265
+250
 600
-437
+422
 633
 prey.chasing.w
 prey.chasing.w
 0
 50
-5
+0
 1
 1
 NIL
@@ -1457,9 +1457,9 @@ To save an empty behavior, simply set frequency to 0 and save.
 1
 
 BUTTON
-440
+425
 700
-515
+500
 733
 Pick patch
 pick.patch
@@ -1581,9 +1581,9 @@ meters
 HORIZONTAL
 
 SLIDER
-265
+250
 530
-437
+422
 563
 rest.w
 rest.w
@@ -1696,9 +1696,9 @@ max.sustained.speed / fish.size
 
 BUTTON
 335
-230
+280
 525
-266
+316
 Estimate speeds
 estimate-speeds
 NIL
@@ -1713,9 +1713,9 @@ NIL
 
 INPUTBOX
 260
-230
+280
 335
-290
+340
 aspect.ratio
 3
 1
@@ -1724,9 +1724,9 @@ Number
 
 TEXTBOX
 345
-270
+320
 525
-305
+355
 from caudal fin aspect ratio and body length.
 11
 0.0
@@ -1874,25 +1874,25 @@ NIL
 1
 
 SLIDER
-265
+250
 565
-437
+422
 598
 cruise.w
 cruise.w
 0
 10
-5
+0
 1
 1
 NIL
 HORIZONTAL
 
 CHOOSER
-415
-1145
-507
-1190
+425
+60
+525
+105
 csv.delimiter
 csv.delimiter
 "," ";"
@@ -2031,9 +2031,9 @@ in g and cm2\n
 
 BUTTON
 445
-130
+180
 525
-175
+225
 paint fishes
 ask fishes [set color fish.color]
 NIL
@@ -2123,10 +2123,10 @@ m
 HORIZONTAL
 
 BUTTON
-470
-310
-525
-350
+460
+750
+515
+790
 STOP
 set recording FALSE\nmovie-close\n
 NIL
@@ -2140,10 +2140,10 @@ NIL
 1
 
 BUTTON
-415
-310
-470
-350
+405
+750
+460
+790
 REC
 let movie.name user-input \"Pick a name for the movie file (exclude extension).\"\nmovie-start word movie.name \".mov\"\nmovie-set-frame-rate movement.time.step\nuser-message (word \"File \" movie.name \".mov created. Press OK to start recording!\")\nset recording true
 NIL
@@ -2157,10 +2157,10 @@ NIL
 1
 
 TEXTBOX
-310
-325
-415
-343
+300
+765
+405
+783
 VIDEO RECORDER
 12
 15.0
@@ -2225,9 +2225,19 @@ TEXTBOX
 870
 1545
 896
-Default values are for the Atlantic Cod
+Default values are for Atlantic Cod (Gadus morhua)
 11
 0.0
+1
+
+TEXTBOX
+435
+515
+515
+590
+Always save as a behavior after changes in this section!
+11
+15.0
 1
 
 @#$#@#$#@
