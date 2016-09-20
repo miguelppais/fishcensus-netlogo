@@ -978,7 +978,7 @@ max.visibility
 max.visibility
 2
 40
-7
+6
 1
 1
 m
@@ -1167,7 +1167,7 @@ transect.distance
 transect.distance
 5
 100
-40
+30
 5
 1
 meters
@@ -1649,7 +1649,7 @@ INPUTBOX
 135
 220
 file.name
-schooling
+schoolmate minus20
 1
 0
 String
@@ -3461,20 +3461,23 @@ NetLogo 5.3.1
       <value value="3"/>
     </enumeratedValueSet>
   </experiment>
-  <experiment name="sensitivity" repetitions="10" runMetricsEveryStep="true">
+  <experiment name="sensitivity" repetitions="15" runMetricsEveryStep="false">
     <setup>setup</setup>
     <go>go</go>
+    <metric>output.estimated</metric>
     <enumeratedValueSet variable="smooth.animation?">
       <value value="false"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="movement.time.step">
       <value value="10"/>
     </enumeratedValueSet>
-    <enumeratedValueSet variable="stationary.turning.angle">
-      <value value="4"/>
-    </enumeratedValueSet>
     <enumeratedValueSet variable="file.name">
-      <value value="&quot;schooling&quot;"/>
+      <value value="&quot;schoolmate minus20&quot;"/>
+      <value value="&quot;schoolmate plus20&quot;"/>
+      <value value="&quot;detectability minus0.1&quot;"/>
+      <value value="&quot;detectability plus0.1&quot;"/>
+      <value value="&quot;speed minus0.1&quot;"/>
+      <value value="&quot;speed plus0.1&quot;"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="sampling.method">
       <value value="&quot;Fixed distance transect&quot;"/>
@@ -3494,17 +3497,11 @@ NetLogo 5.3.1
     <enumeratedValueSet variable="behavior.change.interval">
       <value value="10"/>
     </enumeratedValueSet>
-    <enumeratedValueSet variable="timed.transect.diver.speed">
-      <value value="8"/>
-    </enumeratedValueSet>
     <enumeratedValueSet variable="buddy?">
       <value value="false"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="max.visibility">
-      <value value="7"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="timed.transect.width">
-      <value value="2"/>
+      <value value="6"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="show.diver.detail.window?">
       <value value="false"/>
@@ -3512,17 +3509,11 @@ NetLogo 5.3.1
     <enumeratedValueSet variable="override.density">
       <value value="0.2"/>
     </enumeratedValueSet>
-    <enumeratedValueSet variable="roving.time">
-      <value value="2"/>
-    </enumeratedValueSet>
     <enumeratedValueSet variable="count.saturation">
       <value value="3"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="distance.transect.width">
       <value value="2"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="roving.diver.turning.angle">
-      <value value="20"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="show.paths?">
       <value value="false"/>
