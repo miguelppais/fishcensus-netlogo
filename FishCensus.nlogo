@@ -97,6 +97,11 @@ divers-own [             ; distance transect diver variables
 
 ;Interface procedures
 
+to startup
+  set file.name "example"
+  set override.density 0
+end
+
 
 to setup
   ca
@@ -1343,7 +1348,7 @@ SWITCH
 383
 smooth.animation?
 smooth.animation?
-1
+0
 1
 -1000
 
@@ -1649,7 +1654,7 @@ INPUTBOX
 135
 220
 file.name
-schoolmate minus20
+example
 1
 0
 String

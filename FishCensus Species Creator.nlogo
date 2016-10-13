@@ -38,6 +38,10 @@ patches-own [
 
 ;; Setup Procedures
 
+to startup
+  create-new-species
+end
+
 to estimate-speeds   ; from caudal fin aspect ratio and fish size, acording to Sambilay, Jr. (1990)
 let size.cm fish.size * 100
 let rel.speed 10 ^ ((0.616 - (0.3804 * log size.cm 10)) + (0.3478 * (log aspect.ratio 10)))
@@ -731,7 +735,7 @@ perception.dist
 perception.dist
 0.05
 5
-0.6
+0.5
 0.05
 1
 meters
@@ -746,7 +750,7 @@ max.sustained.speed
 max.sustained.speed
 0
 10
-0.5
+0.3
 0.1
 1
 m/s
@@ -761,7 +765,7 @@ max.acceleration
 max.acceleration
 0
 2
-0.15
+0.1
 0.05
 1
 m/s^2
@@ -776,7 +780,7 @@ schoolmate.dist
 schoolmate.dist
 0.1
 10
-1
+4
 0.1
 1
 body lenghts
@@ -791,7 +795,7 @@ spacing.w
 spacing.w
 0
 50
-20
+0
 1
 1
 NIL
@@ -806,7 +810,7 @@ center.w
 center.w
 0
 20
-5
+0
 1
 1
 NIL
@@ -821,7 +825,7 @@ align.w
 align.w
 0
 20
-10
+0
 1
 1
 NIL
@@ -836,7 +840,7 @@ wander.w
 wander.w
 0
 10
-8
+3
 1
 1
 NIL
@@ -885,7 +889,7 @@ picked.patch.dist
 picked.patch.dist
 0
 10
-1
+0.5
 0.5
 1
 meters
@@ -900,7 +904,7 @@ predator.avoidance.w
 predator.avoidance.w
 -5
 100
-100
+4
 1
 1
 NIL
@@ -913,7 +917,7 @@ SWITCH
 493
 schooling?
 schooling?
-0
+1
 1
 -1000
 
@@ -926,7 +930,7 @@ perception.angle
 perception.angle
 45
 360
-320
+360
 5
 1
 degrees
@@ -941,7 +945,7 @@ diver.avoidance.w
 diver.avoidance.w
 -5
 100
-10
+4
 1
 1
 NIL
@@ -956,7 +960,7 @@ patch.gathering.w
 patch.gathering.w
 0
 20
-0
+6
 1
 1
 NIL
@@ -971,7 +975,7 @@ approach.dist
 approach.dist
 0.5
 10
-1.5
+0.7
 0.1
 1
 meters
@@ -983,7 +987,7 @@ INPUTBOX
 255
 120
 species.name
-new species
+Cryptic
 1
 0
 String
@@ -1055,7 +1059,7 @@ INPUTBOX
 165
 910
 B1.name
-n/a
+guarding
 1
 0
 String
@@ -1083,7 +1087,7 @@ INPUTBOX
 165
 970
 B2.name
-n/a
+feeding
 1
 0
 String
@@ -1094,7 +1098,7 @@ INPUTBOX
 165
 1030
 B3.name
-n/a
+nested
 1
 0
 String
@@ -1105,7 +1109,7 @@ INPUTBOX
 165
 1090
 B4.name
-n/a
+patrolling
 1
 0
 String
@@ -1238,7 +1242,7 @@ fish.size
 fish.size
 0.05
 1
-0.3
+0.1
 0.01
 1
 meters
@@ -1297,7 +1301,7 @@ id.distance
 id.distance
 0.5
 20
-5
+1
 0.5
 1
 meters
@@ -1323,7 +1327,7 @@ b1.freq
 b1.freq
 0
 1
-0
+0.25
 0.05
 1
 NIL
@@ -1338,7 +1342,7 @@ b2.freq
 b2.freq
 0
 1
-0
+0.2
 0.05
 1
 NIL
@@ -1353,7 +1357,7 @@ b3.freq
 b3.freq
 0
 1
-0
+0.1
 0.05
 1
 NIL
@@ -1368,7 +1372,7 @@ b4.freq
 b4.freq
 0
 1
-0
+0.45
 0.05
 1
 NIL
@@ -1404,7 +1408,7 @@ detectability
 detectability
 0
 1
-1
+0.3
 0.1
 1
 NIL
@@ -1589,7 +1593,7 @@ rest.w
 rest.w
 0
 20
-0
+2
 1
 1
 NIL
@@ -1822,7 +1826,7 @@ burst.speed
 burst.speed
 0
 10
-2.9
+1.1
 0.1
 1
 m/s
