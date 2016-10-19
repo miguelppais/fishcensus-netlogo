@@ -1,7 +1,7 @@
 extensions [
   csv              ; used to import species parameters through a csv file
   rnd              ; used by fishes to calculate next behavior with a weighted random pick
-  profiler
+  profiler         ; performance check and optimization
   ]
 
 ;Global variables not represented on the interface tab
@@ -56,7 +56,7 @@ fishes-own [                     ; fish variables
   prey.type                      ; "benthic" or "fish". Defines the type of feeding behavior (gather around a patch or chase prey)
   detectability                  ; probability of being missed (if = 1 fish is always counted if within id.distance)
   visible?                       ; boolean variable that is set by detectability every second
-  id.distance                   ; maximum distance from diver required to correctly identify the species
+  id.distance                    ; maximum distance from diver at which it is still possible to identify the species (and count the fish)
   approach.dist                  ; minimum distance from diver that the fish tolerate
   behavior.list                  ; list of up to 4 distinct behaviors
   behavior.freqs                 ; frequency of each behavior
@@ -1588,7 +1588,7 @@ INPUTBOX
 310
 70
 override.density
-0.2
+0
 1
 0
 Number
@@ -1711,17 +1711,19 @@ NIL
 1
 
 @#$#@#$#@
+## WHAT IS IT
+
+The FishCensus model simulates how different fish behaviours affect density estimates in common underwater visual census methods. These include accuracy and precision of estimates and bias due to non-instantaneous sampling. Ultimately, the model can help decide the best method and sampling effort for a real upcoming field assessment.
+
+## WHAT TO DO
+
+A separate model (FishCensus species creator) is used to create species and save them as csv files to input into FishCensus. An example.csv file is provided to test the model.
 
 
-
-## RELATED MODELS
-
-AnimDens model was implemented in R by Christine Ward-Paige, Joanna Mills Flemming and Heike K. Lotze. The code can be downloaded at:
-
-http://journals.plos.org/plosone/article/asset?unique&id=info:doi/10.1371/journal.pone.0011722.s001
 
 ## CREDITS AND REFERENCES
 
+PRE-PUBLICATION VERSION! PLEASE DO NOT DISTRIBUTE!
 
 ## COPYRIGHT AND LICENSE
 
