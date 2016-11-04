@@ -1,7 +1,6 @@
 extensions [
   csv              ; used to import species parameters through a csv file
   rnd              ; used by fishes to calculate next behavior with a weighted random pick
-  profiler         ; performance check and optimization
   ]
 
 ;Global variables not represented on the interface tab
@@ -817,8 +816,6 @@ to forget.fishes                                                        ; runs i
 end
 
 
-
-
 ; USEFUL REPORTERS
 
 to-report random-bernoulli [probability-true]
@@ -1348,7 +1345,7 @@ SWITCH
 383
 smooth.animation?
 smooth.animation?
-0
+1
 1
 -1000
 
@@ -1588,7 +1585,7 @@ INPUTBOX
 310
 70
 override.density
-0
+0.3
 1
 0
 Number
@@ -1654,61 +1651,10 @@ INPUTBOX
 135
 220
 file.name
-example
+cryptic
 1
 0
 String
-
-BUTTON
-1060
-635
-1162
-668
-NIL
-profiler:start
-NIL
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
-
-BUTTON
-1060
-670
-1267
-703
-NIL
-profiler:stop print profiler:report
-NIL
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
-
-BUTTON
-1060
-705
-1162
-738
-NIL
-profiler:reset
-NIL
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
 
 @#$#@#$#@
 ## WHAT IS IT
