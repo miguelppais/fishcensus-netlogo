@@ -27,9 +27,10 @@ globals[
   snapshot.estimates
   density.estimates
   bias.estimates
-  output.real              ; outputs for behaviorspace experiments (only work with 1 species)
+  output.real              ; outputs for behaviorspace experiments (only works with 1st species in input file)
   output.estimated
   output.difference
+  output.inaccuracy
   output.bias
   output.instantaneous
 ]
@@ -435,9 +436,10 @@ to do.outputs
       output-print (word first bias.pair ": " last bias.pair)
       ]
       ]
-   set output.real total.density                             ; fill output variables (only for 1st species)
+   set output.real total.density                             ; fill output variables for BehaviourSpace (if more than 1 species, these outputs only apply to the 1st)
    set output.estimated last first density.estimates
    set output.difference output.estimated - output.real
+   set output.inaccuracy output.difference / output.real
    set output.instantaneous last first snapshot.estimates
    set output.bias last first bias.estimates
   ]
@@ -1585,7 +1587,7 @@ INPUTBOX
 310
 70
 override.density
-0.3
+0
 1
 0
 Number
@@ -1651,7 +1653,7 @@ INPUTBOX
 135
 220
 file.name
-cryptic
+example
 1
 0
 String
