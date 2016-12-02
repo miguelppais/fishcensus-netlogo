@@ -1667,11 +1667,13 @@ The FishCensus model simulates how different fish behaviours affect density esti
 
 A separate model (FishCensus species creator) is used to create species and save them as csv files to input into FishCensus. An example.csv file is provided to test the model.
 
+## RELATED MODELS
+
 
 
 ## CREDITS AND REFERENCES
 
-PRE-PUBLICATION VERSION! PLEASE DO NOT DISTRIBUTE!
+
 
 ## COPYRIGHT AND LICENSE
 
