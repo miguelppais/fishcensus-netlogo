@@ -735,7 +735,7 @@ perception.dist
 perception.dist
 0.05
 5
-0.5
+0.6
 0.05
 1
 meters
@@ -750,7 +750,7 @@ max.sustained.speed
 max.sustained.speed
 0
 10
-0.3
+0.5
 0.1
 1
 m/s
@@ -765,7 +765,7 @@ max.acceleration
 max.acceleration
 0
 2
-0.1
+0.15
 0.05
 1
 m/s^2
@@ -780,7 +780,7 @@ schoolmate.dist
 schoolmate.dist
 0.1
 10
-4
+1
 0.1
 1
 body lenghts
@@ -795,7 +795,7 @@ spacing.w
 spacing.w
 0
 50
-0
+20
 1
 1
 NIL
@@ -810,7 +810,7 @@ center.w
 center.w
 0
 20
-0
+5
 1
 1
 NIL
@@ -825,7 +825,7 @@ align.w
 align.w
 0
 20
-0
+10
 1
 1
 NIL
@@ -840,7 +840,7 @@ wander.w
 wander.w
 0
 10
-3
+8
 1
 1
 NIL
@@ -889,7 +889,7 @@ picked.patch.dist
 picked.patch.dist
 0
 10
-0.5
+1
 0.5
 1
 meters
@@ -904,7 +904,7 @@ predator.avoidance.w
 predator.avoidance.w
 -5
 100
-4
+100
 1
 1
 NIL
@@ -917,7 +917,7 @@ SWITCH
 493
 schooling?
 schooling?
-1
+0
 1
 -1000
 
@@ -930,7 +930,7 @@ perception.angle
 perception.angle
 45
 360
-360
+320
 5
 1
 degrees
@@ -945,7 +945,7 @@ diver.avoidance.w
 diver.avoidance.w
 -5
 100
-4
+10
 1
 1
 NIL
@@ -960,7 +960,7 @@ patch.gathering.w
 patch.gathering.w
 0
 20
-6
+0
 1
 1
 NIL
@@ -975,7 +975,7 @@ approach.dist
 approach.dist
 0.5
 10
-0.7
+1.5
 0.1
 1
 meters
@@ -987,7 +987,7 @@ INPUTBOX
 255
 120
 species.name
-Cryptic
+new species
 1
 0
 String
@@ -1059,7 +1059,7 @@ INPUTBOX
 165
 910
 B1.name
-guarding
+n/a
 1
 0
 String
@@ -1087,7 +1087,7 @@ INPUTBOX
 165
 970
 B2.name
-feeding
+n/a
 1
 0
 String
@@ -1098,7 +1098,7 @@ INPUTBOX
 165
 1030
 B3.name
-nested
+n/a
 1
 0
 String
@@ -1109,7 +1109,7 @@ INPUTBOX
 165
 1090
 B4.name
-patrolling
+n/a
 1
 0
 String
@@ -1242,7 +1242,7 @@ fish.size
 fish.size
 0.05
 1
-0.1
+0.3
 0.01
 1
 meters
@@ -1301,7 +1301,7 @@ id.distance
 id.distance
 0.5
 20
-1
+5
 0.5
 1
 meters
@@ -1327,7 +1327,7 @@ b1.freq
 b1.freq
 0
 1
-0.25
+0
 0.05
 1
 NIL
@@ -1342,7 +1342,7 @@ b2.freq
 b2.freq
 0
 1
-0.2
+0
 0.05
 1
 NIL
@@ -1357,7 +1357,7 @@ b3.freq
 b3.freq
 0
 1
-0.1
+0
 0.05
 1
 NIL
@@ -1372,7 +1372,7 @@ b4.freq
 b4.freq
 0
 1
-0.45
+0
 0.05
 1
 NIL
@@ -1408,7 +1408,7 @@ detectability
 detectability
 0
 1
-0.3
+1
 0.1
 1
 NIL
@@ -1593,7 +1593,7 @@ rest.w
 rest.w
 0
 20
-2
+0
 1
 1
 NIL
@@ -1826,7 +1826,7 @@ burst.speed
 burst.speed
 0
 10
-1.1
+2.9
 0.1
 1
 m/s
@@ -2255,7 +2255,7 @@ Copyright 2016 Miguel Pessanha Pais
 
 ![CC BY-NC-SA 3.0](http://ccl.northwestern.edu/images/creativecommons/byncsa.png)
 
-This work is licensed under the Creative Commons Attribution-NonCommercial-ShareAlike 3.0 License.  To view a copy of this license, visit http://creativecommons.org/licenses/by-nc-sa/3.0/ or send a letter to Creative Commons, 559 Nathan Abbott Way, Stanford, California 94305, USA.
+This work is licensed under the Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License.  To view a copy of this license, visit http://creativecommons.org/licenses/by-nc-sa/4.0/
 @#$#@#$#@
 default
 true
