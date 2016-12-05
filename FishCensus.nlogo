@@ -222,7 +222,7 @@ if sampling.method = "Fixed time transect" [                                    
  setxy (world-width / 2) 5
  if show.paths? = true [pen-down]                                                           ;this shows the path of the diver
  set speed timed.transect.diver.mean.speed
- set viewangle 180
+ set viewangle transect.viewangle
  set counted.fishes [] ; sets counted.fishes as an empty list
  set snapshot.fishes ([species] of (fishes with [(xcor >= (world-width / 2) - timed.transect.width) and (xcor <= (world-width / 2) + timed.transect.width) and (ycor >= (world-height / 4)) and (ycor <= ((world-height / 4) + (transect.time * timed.transect.diver.speed)))]))
   ]
@@ -246,7 +246,7 @@ if sampling.method = "Fixed distance transect" [                                
  setxy (world-width / 2) 5
  if show.paths? = true [pen-down]                                                           ;this shows the path of the diver
  set speed distance.transect.diver.mean.speed
- set viewangle 180
+ set viewangle transect.viewangle
  set initial.ycor ycor                                                              ; fixed distance transect divers record their start and end points as given by "transect.distance" initially
  set final.ycor ycor + transect.distance                                            ; because coordinates are in meters
  set counted.fishes [] ; sets counted.fishes as an empty list
@@ -270,7 +270,7 @@ if sampling.method = "Stationary point count" [                                 
  set color red
  set size 2
  setxy (world-width / 2) (world-height / 2)
- set viewangle 160
+ set viewangle stationary.viewangle
  set counted.fishes [] ; sets counted.fishes as an empty list
  set snapshot.fishes ([species] of (fishes in-radius stationary.radius))
 ]
@@ -294,7 +294,7 @@ if sampling.method = "Random path" [                                            
  setxy (world-width / 2) 5
  if show.paths? = true [pen-down]                                                           ;this shows the path of the diver
  set speed roving.diver.mean.speed
- set viewangle 160
+ set viewangle rpath.viewangle
  set counted.fishes [] ; sets counted.fishes as an empty list
  set snapshot.fishes []  ; sets snapshot.fishes as an empty list (no snapshot possible for roving divers, as their path is random)
 ]
@@ -1108,7 +1108,7 @@ TEXTBOX
 10
 1505
 51
-Ability to remember all counted fishes (If turned off, divers forget fishes that leave the FOV). Applies to all divers.
+Ability to remember all counted fishes (If turned off, divers forget fishes that leave the FOV). Applies to all divers. Default is off.
 11
 0.0
 1
@@ -1462,30 +1462,30 @@ Water visibility (Affects the divers' field of view)
 1
 
 CHOOSER
-1270
-350
-1485
-395
+1275
+475
+1490
+520
 movement.time.step
 movement.time.step
 5 10
 1
 
 TEXTBOX
-1270
-290
-1505
-346
+1275
+415
+1510
+471
 Number of decisions per second in the fish movement model. This must match the frame rate in model settings for normal speed to match real time.
 11
 0.0
 1
 
 TEXTBOX
-1270
-400
-1510
-456
+1275
+525
+1515
+581
 Please test behaviors in the species creator with the same number of decisions per second. Different values can lead to very different behaviors with the same parameters.
 11
 15.0
@@ -1572,10 +1572,10 @@ Buddy diver only assists main diver, but may affect fish responses.
 1
 
 TEXTBOX
-1294
-373
-1429
-399
+1299
+498
+1434
+524
 decisions per second
 11
 0.0
@@ -1658,30 +1658,166 @@ example
 0
 String
 
+SLIDER
+1270
+305
+1490
+338
+transect.viewangle
+transect.viewangle
+10
+360
+180
+10
+1
+degrees
+HORIZONTAL
+
+SLIDER
+1270
+340
+1490
+373
+stationary.viewangle
+stationary.viewangle
+10
+360
+160
+10
+1
+degrees
+HORIZONTAL
+
+SLIDER
+1270
+375
+1490
+408
+rpath.viewangle
+rpath.viewangle
+10
+360
+160
+10
+1
+degrees
+HORIZONTAL
+
+TEXTBOX
+1275
+290
+1425
+308
+Diver view angles per method
+11
+0.0
+1
+
+BUTTON
+1495
+305
+1550
+410
+defaults
+set transect.viewangle 180\nset stationary.viewangle 160\nset rpath.viewangle 160
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+BUTTON
+1490
+235
+1550
+268
+default
+set behavior.change.interval 10
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+BUTTON
+1490
+90
+1550
+123
+default
+set count.saturation 3
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
 @#$#@#$#@
-## WHAT IS IT
+## Context
 
-The FishCensus model simulates how different fish behaviours affect density estimates in common underwater visual census methods. These include accuracy and precision of estimates and bias due to non-instantaneous sampling. Ultimately, the model can help decide the best method and sampling effort for a real upcoming field assessment.
+Underwater visual census (UVC) methods are used worldwide to monitor shallow marine and freshwater habitats and support management and conservation decisions. However, several sources of bias still undermine the ability of these methods to accurately estimate abundances of some species.
 
-## WHAT TO DO
+## FishCensus Model
 
-A separate model (FishCensus species creator) is used to create species and save them as csv files to input into FishCensus. An example.csv file is provided to test the model.
+FishCensus is an agent-based model that simulates underwater visual census of fish populations, a method used worldwide to survey shallow marine and freshwater habitats that involves a diver counting fish species to estimate their density. It can help estimate sampling bias, apply correction factors to field surveys and decide on the best method to survey a particular species, given its behavioural traits, detectability or speed.
+A modified vector-based boids-like movement submodel is used for fish, and complex behaviours such as schooling or diver avoidance / attraction can be represented.
 
-## RELATED MODELS
+## How it works
+
+The FishCensus model comes with two separate programs. The Species Creator is used to create new fish species or observe/edit existing ones. Species parameters can be exported as a .csv file and imported into the main model where the simulation happens.
+
+In the main FishCensus program, a virtual diver uses a pre-selected survey method (*e.g.* fixed distance or timed transect, stationary point counts) to count the fish and estimate their density. The true density of fish is pre-determined and known, which allows for the quantification of bias, a measure that is unknown in the field, where determining the true abundance is very difficult.
+
+## Related models
+
+###  AnimDens model, originally programmed in R:
+
+Ward-Paige, C.A., Flemming, J.M., Lotze, H.K., 2010. Overestimating fish counts by non-instantaneous visual censuses: Consequences for population and community descriptions. PLoS One 5, e11722. doi:10.1371/journal.pone.0011722
+
+### Replication of the AnimDens model in NetLogo with some added features:
+
+Pais, M.P., Ward-Paige, C.A. (2015). AnimDens NetLogo model. http://modelingcommons.org/browse/one_model/4408
+
+### Vector-based swarming by Uri Wilensky, in the NetLogo 3D library:
+
+Wilensky, U. (2005).  NetLogo Flocking 3D Alternate model.  http://ccl.northwestern.edu/netlogo/models/Flocking3DAlternate.  Center for Connected Learning and Computer-Based Modeling, Northwestern University, Evanston, IL.
+
+## Credits and references
+
+If you use this model, please cite the original publication:
+
+Pais, M.P., Cabral, H.N. 2017. Fish behaviour effects on the accuracy and precision of underwater visual census surveys. A virtual ecologist approach using an individual-based model. Ecological Modelling, in press.
+
+To cite the model itself, please visit the [OpenABM page](https://www.openabm.org/model/5305) for citation instructions.
 
 
+## Acknowledgments
 
-## CREDITS AND REFERENCES
-
-
+I thank everyone who tested the model and interface and helped find bugs, Christine Ward-Paige for clarifications and suggestions about the AnimDens model, Uri Wilenksy for NetLogo and the base code for vector-based swarming, Kenneth Rose for valuable feedback and suggestions and J.P. Rosa for revising the calculation of drag forces. This study had the support of Fundação para a Ciência e Tecnologia (FCT), through the strategic project UID/MAR/04292/2013 granted to MARE and the grant awarded to Miguel P. Pais (SFRH/BPD/94638/2013).
 
 ## COPYRIGHT AND LICENSE
 
 Copyright 2016 Miguel Pessanha Pais
 
-![CC BY-NC-SA 3.0](http://ccl.northwestern.edu/images/creativecommons/byncsa.png)
+![CC BY-NC-SA 4.0](http://ccl.northwestern.edu/images/creativecommons/byncsa.png)
 
 This work is licensed under the Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License.  To view a copy of this license, visit http://creativecommons.org/licenses/by-nc-sa/4.0/
+
+## Contact the author
+
+If you want to report bugs, suggest features, share work you did with the model, or even insult me, please send me an email: [mppais@fc.ul.pt](mailto:mppais@fc.ul.pt)
 @#$#@#$#@
 default
 true
