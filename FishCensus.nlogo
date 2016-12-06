@@ -200,15 +200,15 @@ to setup
         sublist sp.param 66 82)
       set visible? true
       set behavior.set? false
-      set.behavior                          ; fish procedure that draws the starting behavior from the list and fills in parameters (this resets "visible?" depending on picked behavior)
+      set.first.behavior                     ; fish procedure that picks the first behavior in behavior.list as the starting behavior and fills in parameters (this sets "visible?" depending on detectability of first behavior)
     ]
   ]
   set total.density (count fishes / world.area) ; this takes into account the actual number of fishes in the area, and not the original input number.
   set numb.fishes count fishes
   output-print (word "Imported " count fishes " fishes belonging to " nr.species " species,")
   output-print (word "with a total density of " total.density " fish per square meter.")
-  output-print "Running movement model for 20 model seconds..."
-  ask fishes [repeat movement.time.step * 20 [do.fish.movement]] ; lets the fish movement model stabilize for 20 ticks
+  output-print (word "Stabilizing fish movement for " initial.time.to.stabilize.movement " model seconds...")
+  ask fishes [repeat movement.time.step * initial.time.to.stabilize.movement [do.fish.movement]] ; lets the fish movement model stabilize for a pre-determined amount of model seconds (20 by default).
 
 
   output-print "Placing diver..."
@@ -593,6 +593,33 @@ to set.behavior                                                        ; fish pr
     ifelse patch.gathering.w > 0 [                                       ; if selected behavior has patch gathering urge, pick a patch. If in a school, ask schoolmates to pick a patch collectively.
       pick.patch] [set picked.patch false]                               ; if patch gathering urge has zero weight, variable picked.patch is set to false (important for pick.patch procedure).
   ]
+end
+
+to set.first.behavior                                                    ; fish procedure
+    set current.behavior first behavior.list                             ; set behavior to first in the list (this should be the most frequent and/or the most typical for the species)
+    let params first behavior.params                                     ; retreive list of parameters from the first position in behavior.params
+    set detectability item 2 params
+    set schooling? item 3 params
+    set schoolmate.dist item 4 params
+    set align.w item 5 params
+    set center.w item 6 params
+    set spacing.w item 7 params
+    set wander.w item 8 params
+    set rest.w item 9 params
+    set cruise.w item 10 params
+    set picked.patch.dist item 11 params
+    set patch.gathering.w item 12 params
+    set predator.avoidance.w item 13 params
+    set prey.chasing.w item 14 params
+    set diver.avoidance.w item 15 params
+    ifelse detectability < 1 [
+      set visible? random-bernoulli detectability    ; visibility of individual fish is set when behavior changes, using a Bernoulli trial
+      ] [
+      set visible? true
+      ]
+    set behavior.set? true
+    ifelse patch.gathering.w > 0 [                                       ; if selected behavior has patch gathering urge, pick a patch. If in a school, ask schoolmates to pick a patch collectively.
+      pick.patch] [set picked.patch false]                               ; if patch gathering urge has zero weight, variable picked.patch is set to false (important for pick.patch procedure).
 end
 
 ; fish urges
@@ -982,7 +1009,7 @@ max.visibility
 max.visibility
 2
 40
-6
+7
 1
 1
 m
@@ -1347,7 +1374,7 @@ SWITCH
 383
 smooth.animation?
 smooth.animation?
-1
+0
 1
 -1000
 
@@ -1463,9 +1490,9 @@ Water visibility (Affects the divers' field of view)
 
 CHOOSER
 1275
-475
+515
 1490
-520
+560
 movement.time.step
 movement.time.step
 5 10
@@ -1473,9 +1500,9 @@ movement.time.step
 
 TEXTBOX
 1275
-415
+455
 1510
-471
+511
 Number of decisions per second in the fish movement model. This must match the frame rate in model settings for normal speed to match real time.
 11
 0.0
@@ -1483,9 +1510,9 @@ Number of decisions per second in the fish movement model. This must match the f
 
 TEXTBOX
 1275
-525
+565
 1515
-581
+621
 Please test behaviors in the species creator with the same number of decisions per second. Different values can lead to very different behaviors with the same parameters.
 11
 15.0
@@ -1573,9 +1600,9 @@ Buddy diver only assists main diver, but may affect fish responses.
 
 TEXTBOX
 1299
-498
+538
 1434
-524
+564
 decisions per second
 11
 0.0
@@ -1719,7 +1746,7 @@ BUTTON
 1550
 410
 defaults
-set transect.viewangle 180\nset stationary.viewangle 160\nset rpath.viewangle 160
+set transect.viewangle 180\nset stationary.viewangle 160\nset rpath.viewangle 160\nset initial.time.to.stabilize.movement 20
 NIL
 1
 T
@@ -1763,6 +1790,21 @@ NIL
 NIL
 NIL
 1
+
+SLIDER
+1270
+415
+1550
+448
+initial.time.to.stabilize.movement
+initial.time.to.stabilize.movement
+5
+50
+20
+5
+1
+seconds
+HORIZONTAL
 
 @#$#@#$#@
 ## Context
