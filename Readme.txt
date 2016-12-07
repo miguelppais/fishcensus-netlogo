@@ -1,8 +1,9 @@
-FishCensus model version 1.0
+FishCensus model version 1.1
 
 by Miguel Pessanha Pais (mppais@fc.ul.pt)
 
 Programmed in NetLogo 5.3.1
+
 
 ## Context
 
@@ -57,3 +58,9 @@ This work is licensed under the Creative Commons Attribution-NonCommercial-Share
 ## Contact the author
 
 If you want to report bugs, suggest features, share work you did with the model, or even insult me, please send me an email: [mppais@fc.ul.pt](mailto:mppais@fc.ul.pt)
+
+## Changelog
+
+Version 1.1
+- Added more sliders on the interface to edit the movement initialization time and diver view angles
+- During initialization, fish will now pick the FIRST behavior from the list, and not a random one.
