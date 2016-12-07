@@ -1822,13 +1822,21 @@ The FishCensus model comes with two separate programs. The Species Creator is us
 
 In the main FishCensus program, a virtual diver uses a pre-selected survey method (*e.g.* fixed distance or timed transect, stationary point counts) to count the fish and estimate their density. The true density of fish is pre-determined and known, which allows for the quantification of bias, a measure that is unknown in the field, where determining the true abundance is very difficult.
 
+For more information and tutorials visit the [wiki at Bitbucket](https://bitbucket.org/MiguelPPais/fishcensus/wiki/Home) and the [openABM](https://www.openabm.org/model/530) page.
+
 ## Related models
 
-###  AnimDens model, originally programmed in R:
+### Reefex model
 
-Ward-Paige, C.A., Flemming, J.M., Lotze, H.K., 2010. Overestimating fish counts by non-instantaneous visual censuses: Consequences for population and community descriptions. PLoS One 5, e11722. doi:10.1371/journal.pone.0011722
+Watson, R.A., Carlos, G.M., & Samoilys, M.A., 1995. Bias introduced by the non-random movement of fish in visual transect surveys. Ecological Modelling 77(2–3), 205–214. http://doi.org/10.1016/0304-3800(93)E0085-H
 
-### Replication of the AnimDens model in NetLogo with some added features:
+###  AnimDens model
+
+#### Origial publication of the model and R code
+
+Ward-Paige, C.A., Flemming, J.M., Lotze, H.K., 2010. Overestimating fish counts by non-instantaneous visual censuses: Consequences for population and community descriptions. PLoS One 5, e11722. http://doi.org/10.1371/journal.pone.0011722
+
+#### Replication of the AnimDens model in NetLogo with some added features:
 
 Pais, M.P., Ward-Paige, C.A. (2015). AnimDens NetLogo model. http://modelingcommons.org/browse/one_model/4408
 
@@ -1849,6 +1857,10 @@ To cite the model itself, please visit the [OpenABM page](https://www.openabm.or
 
 I thank everyone who tested the model and interface and helped find bugs, Christine Ward-Paige for clarifications and suggestions about the AnimDens model, Uri Wilenksy for NetLogo and the base code for vector-based swarming, Kenneth Rose for valuable feedback and suggestions and J.P. Rosa for revising the calculation of drag forces. This study had the support of Fundação para a Ciência e Tecnologia (FCT), through the strategic project UID/MAR/04292/2013 granted to MARE and the grant awarded to Miguel P. Pais (SFRH/BPD/94638/2013).
 
+## Contact the author
+
+If you want to report bugs, suggest features, share work you did with the model, or even insult me, please send me an email: [mppais@fc.ul.pt](mailto:mppais@fc.ul.pt)
+
 ## COPYRIGHT AND LICENSE
 
 Copyright 2016 Miguel Pessanha Pais
@@ -1857,9 +1869,28 @@ Copyright 2016 Miguel Pessanha Pais
 
 This work is licensed under the Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License.  To view a copy of this license, visit http://creativecommons.org/licenses/by-nc-sa/4.0/
 
-## Contact the author
+### Disclaimer
 
-If you want to report bugs, suggest features, share work you did with the model, or even insult me, please send me an email: [mppais@fc.ul.pt](mailto:mppais@fc.ul.pt)
+THIS MODEL IS PROVIDED "AS IS" AND ANY EXPRESSED OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR (MIGUEL PAIS), THE MARINE AND ENVIRONMENTAL SCIENCES CENTRE (MARE), THE UNIVERSITY OF LISBON, OR ANY OF THEIR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS MODEL, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+Without limiting the foregoing, the author of the model makes no warranty that:
+
+1. the model will meet your requirements.
+2. the model will be uninterrupted, timely, secure or error-free.
+3. the results that may be obtained from the use of the model will be effective, accurate or reliable.
+4. the quality of the model will meet your expectations.
+5. any errors in the model obtained from the OpenABM web site will be corrected.
+
+The model and its documentation made available on the OpenABM web site:
+
+1. could include technical or other mistakes, inaccuracies or typographical errors.
+2. model contributors may make changes to the software or documentation made available on the web site.
+3. may be out of date and the model contributors or MARE make no commitment to update such materials.
+4. The author, contributors, and MARE assume no responsibility for errors or ommissions in the model or documentation available from the OpenABM web site.
+
+In no event shall the author, model contributors or MARE be liable to you or any third parties for any special, punitive, incidental, indirect or consequential damages of any kind, or any damages whatsoever, including, without limitation, those resulting from loss of use, data or profits, whether or not the author, model contributors, or MARE have been advised of the possibility of such damages, and on any theory of liability, arising out of or in connection with the use of this model.
+
+The use of the model downloaded through the OpenABM site is done at your own discretion and risk and with agreement that you will be solely responsible for any damage to your computer system or loss of data that results from such activities. No advice or information, whether oral or written, obtained by you from OpenABM, the author, model contributors, or MARE shall create any warranty for the model.
 @#$#@#$#@
 default
 true
