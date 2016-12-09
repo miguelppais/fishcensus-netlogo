@@ -2244,6 +2244,16 @@ Always save as a behavior after changes in this section!
 15.0
 1
 
+TEXTBOX
+415
+850
+530
+920
+This behavior is used to initialize the census model. Pick the most common or typical.
+11
+15.0
+1
+
 @#$#@#$#@
 ##WHAT IS IT##
 
