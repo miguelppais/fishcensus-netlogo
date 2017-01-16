@@ -164,8 +164,8 @@ to setup
 ; read the information stored in species.data to place fishes
 
   output-print "Placing fishes..."
-  foreach n-values nr.species [? + 1] [           ; loop that creates fish for each species and sets all fish variables
-    let sp.param item ? species.data
+  foreach n-values nr.species [[x] -> x + 1] [           ; loop that creates fish for each species and sets all fish variables
+    [n] -> let sp.param item n species.data
     ifelse override.density = 0 [set total.density item 4 sp.param]
     [set total.density override.density]
     create-fishes (total.density * world.area) [
@@ -175,7 +175,7 @@ to setup
       set picked.patch false
       set schoolmates no-turtles                  ; sets schoolmates as an empty agentset
       set species item 0 sp.param
-      if length sp.param != 82 [user-message (word "ERROR: species number " ? " '" species "' has a parameter list that is incomplete or too long. Check file.") stop] ; ERROR MESSAGE
+      if length sp.param != 82 [user-message (word "ERROR: species number " n " '" species "' has a parameter list that is incomplete or too long. Check file.") stop] ; ERROR MESSAGE
       set shape item 1 sp.param
       set size item 2 sp.param
       ifelse item 17 sp.param = "Seawater - 1027 Kg/m3" [set wat.dens.value 1027] [set wat.dens.value 1000]
