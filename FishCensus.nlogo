@@ -332,54 +332,54 @@ to go
     do.outputs
     stop]
   if sampling.method = "Stationary point count" and stationary.radius > max.visibility [
-   user-message "ERROR: stationary.radius is greater than max.visibility. Diver will not be able to see the sample area."              ; if the stationary radius is higher than visibility, stop and output an error description«
-   stop
+    user-message "ERROR: stationary.radius is greater than max.visibility. Diver will not be able to see the sample area."              ; if the stationary radius is higher than visibility, stop and output an error description«
+    stop
   ]
 
 
   if sampling.method = "Fixed distance transect" [ask divers [                              ; divers count the fishes and then check if finishing conditions are met
-      d.count.fishes
-      set finished? ycor > final.ycor
-      ]
+    d.count.fishes
+    set finished? ycor > final.ycor
+  ]
   ]
   if sampling.method = "Fixed time transect" [ask divers [
-      t.count.fishes
-      set finished? ticks > transect.time.secs
-      ]
+    t.count.fishes
+    set finished? ticks > transect.time.secs
+  ]
   ]
   if sampling.method = "Stationary point count" [ask divers [
-      s.count.fishes
-      set finished? ticks > stationary.time.secs
-      ]
+    s.count.fishes
+    set finished? ticks > stationary.time.secs
+  ]
   ]
   if sampling.method = "Random path" [ask divers [
-      r.count.fishes
-      set finished? ticks > roving.time.secs
-      ]
+    r.count.fishes
+    set finished? ticks > roving.time.secs
+  ]
   ]
 
 
 
   repeat movement.time.step [
 
-  if sampling.method = "Fixed distance transect" [ask divers [do.ddiver.movement]]         ; move the diver
-  if sampling.method = "Fixed time transect" [ask divers [do.tdiver.movement]]
-  if sampling.method = "Stationary point count" [ask divers [do.stdiver.movement]]
-  if sampling.method = "Random path" [ask divers [do.rdiver.movement]]
+    if sampling.method = "Fixed distance transect" [ask divers [do.ddiver.movement]]         ; move the diver
+    if sampling.method = "Fixed time transect" [ask divers [do.tdiver.movement]]
+    if sampling.method = "Stationary point count" [ask divers [do.stdiver.movement]]
+    if sampling.method = "Random path" [ask divers [do.rdiver.movement]]
 
 
-  ask buddies [                                                                           ; move the buddy
-   move-to one-of divers
-   set heading [heading] of one-of divers
-   rt 135 fd sqrt 2                           ; keep 1m behind and 1m to the right of the diver
-   set heading [heading] of one-of divers
+    ask buddies [                                                                           ; move the buddy
+      move-to one-of divers
+      set heading [heading] of one-of divers
+      rt 135 fd sqrt 2                           ; keep 1m behind and 1m to the right of the diver
+      set heading [heading] of one-of divers
 
-  ]
-
-  ask fishes [                                                                            ; move the fishes
-    do.fish.movement
     ]
-  if smooth.animation? [display]
+
+    ask fishes [                                                                            ; move the fishes
+      do.fish.movement
+    ]
+    if smooth.animation? [display]
   ] ; closes repeat movement.time.step
 
   if sampling.method = "Random path" and ticks mod 2 = 0 [
@@ -393,7 +393,7 @@ to go
     ask fishes [
       set behavior.set? false
       set.behavior
-      ]                                      ; fishes set a new behavior in the end of the go procedure, every x seconds (determined by behavior.change.interval)
+    ]                                      ; fishes set a new behavior in the end of the go procedure, every x seconds (determined by behavior.change.interval)
   ]
   advance-clock
   tick
@@ -421,27 +421,27 @@ to do.outputs
       output-print (word first sp.dens.pair ": " last sp.dens.pair)
     ]
     output-print "Bias due to non-instantaneous sampling:"
-    foreach n-values nr.species [? + 1] [
-    let sp.param item ? species.data
-    let name item 0 sp.param
-    let snapshot.dens.pair list name precision (occurrences name snapshot.fishes / sampling.area) 3
-    set snapshot.estimates lput snapshot.dens.pair snapshot.estimates ; this just stores snapshot densities in a variable
-    ifelse last snapshot.dens.pair = 0 [
-      let bias.pair list name "n/a"       ; if snapshot.density is 0, do not calculate bias due to non-instantaneous sampling
-      set bias.estimates lput bias.pair bias.estimates ; this just stores bias estimates in a variable
-      output-print (word first bias.pair ": " last bias.pair)
+    foreach n-values nr.species [[x] -> x + 1] [
+      [n] -> let sp.param item n species.data
+      let name item 0 sp.param
+      let snapshot.dens.pair list name precision (occurrences name snapshot.fishes / sampling.area) 3
+      set snapshot.estimates lput snapshot.dens.pair snapshot.estimates ; this just stores snapshot densities in a variable
+      ifelse last snapshot.dens.pair = 0 [
+        let bias.pair list name "n/a"       ; if snapshot.density is 0, do not calculate bias due to non-instantaneous sampling
+        set bias.estimates lput bias.pair bias.estimates ; this just stores bias estimates in a variable
+        output-print (word first bias.pair ": " last bias.pair)
       ] [
-      let bias.pair list name precision ((((last item (? - 1) density.estimates)) - (last snapshot.dens.pair)) / (last snapshot.dens.pair)) 3 ; bias is calculated as (counted density - snapshot density) / snapshot density
-      set bias.estimates lput bias.pair bias.estimates ; this just stores bias estimates in a variable
-      output-print (word first bias.pair ": " last bias.pair)
+        let bias.pair list name precision ((((last item (n - 1) density.estimates)) - (last snapshot.dens.pair)) / (last snapshot.dens.pair)) 3 ; bias is calculated as (counted density - snapshot density) / snapshot density
+        set bias.estimates lput bias.pair bias.estimates ; this just stores bias estimates in a variable
+        output-print (word first bias.pair ": " last bias.pair)
       ]
-      ]
-   set output.real total.density                             ; fill output variables for BehaviourSpace (if more than 1 species, these outputs only apply to the 1st)
-   set output.estimated last first density.estimates
-   set output.difference output.estimated - output.real
-   set output.inaccuracy output.difference / output.real
-   set output.instantaneous last first snapshot.estimates
-   set output.bias last first bias.estimates
+    ]
+    set output.real total.density                             ; fill output variables for BehaviourSpace (if more than 1 species, these outputs only apply to the 1st)
+    set output.estimated last first density.estimates
+    set output.difference output.estimated - output.real
+    set output.inaccuracy output.difference / output.real
+    set output.instantaneous last first snapshot.estimates
+    set output.bias last first bias.estimates
   ]
 end ; of do.outputs
 
@@ -541,10 +541,10 @@ end
 
 to set.behavior                                                        ; fish procedure
   if not behavior.set? [
-    let pairs (map list behavior.list behavior.freqs)                    ; pairs behavior names with probabilities as lists within a list, to work better with the rnd extension: [[b1 0.2] [b2 0.3] [b3 0.5]]
-    set current.behavior first rnd:weighted-one-of pairs [ last ? ]      ; pick a random behavior from behavior list, using a weighted random pick
-    let param.pos position current.behavior behavior.list                ; check which behavior was picked (1, 2, 3 or 4)
-    let params item param.pos behavior.params                            ; retreive list of parameters from the correct position in behavior.params
+    let pairs (map list behavior.list behavior.freqs)                     ; pairs behavior names with probabilities as lists within a list, to work better with the rnd extension: [[b1 0.2] [b2 0.3] [b3 0.5]]
+    set current.behavior first rnd:weighted-one-of-list pairs [ last ? ]  ; pick a random behavior from behavior list, using a weighted random pick
+    let param.pos position current.behavior behavior.list                 ; check which behavior was picked (1, 2, 3 or 4)
+    let params item param.pos behavior.params                             ; retreive list of parameters from the correct position in behavior.params
     set detectability item 2 params
     set schooling? item 3 params
     set schoolmate.dist item 4 params
