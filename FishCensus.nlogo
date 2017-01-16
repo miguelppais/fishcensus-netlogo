@@ -541,10 +541,10 @@ end
 
 to set.behavior                                                        ; fish procedure
   if not behavior.set? [
-    let pairs (map list behavior.list behavior.freqs)                     ; pairs behavior names with probabilities as lists within a list, to work better with the rnd extension: [[b1 0.2] [b2 0.3] [b3 0.5]]
-    set current.behavior first rnd:weighted-one-of-list pairs [ last ? ]  ; pick a random behavior from behavior list, using a weighted random pick
-    let param.pos position current.behavior behavior.list                 ; check which behavior was picked (1, 2, 3 or 4)
-    let params item param.pos behavior.params                             ; retreive list of parameters from the correct position in behavior.params
+    let pairs (map list behavior.list behavior.freqs)                          ; pairs behavior names with probabilities as lists within a list, to work better with the rnd extension: [[b1 0.2] [b2 0.3] [b3 0.5]]
+    set current.behavior first rnd:weighted-one-of-list pairs [[p] -> last p]  ; pick a random behavior from behavior list, using a weighted random pick
+    let param.pos position current.behavior behavior.list                      ; check which behavior was picked (1, 2, 3 or 4)
+    let params item param.pos behavior.params                                  ; retreive list of parameters from the correct position in behavior.params
     set detectability item 2 params
     set schooling? item 3 params
     set schoolmate.dist item 4 params
