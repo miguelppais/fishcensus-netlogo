@@ -175,7 +175,7 @@ to setup
       set picked.patch false
       set schoolmates no-turtles                  ; sets schoolmates as an empty agentset
       set species item 0 sp.param
-      if length sp.param != 82 [user-message (word "ERROR: species number "  " '" species "' has a parameter list that is incomplete or too long. Check file.") stop] ; ERROR MESSAGE
+      if length sp.param != 82 [user-message (word "ERROR: species number " n " '" species "' has a parameter list that is incomplete or too long. Check file.") stop] ; ERROR MESSAGE
       set shape item 1 sp.param
       set size item 2 sp.param
       ifelse item 17 sp.param = "Seawater - 1027 Kg/m3" [set wat.dens.value 1027] [set wat.dens.value 1000]
@@ -413,8 +413,8 @@ end
 to do.outputs
   ask divers [
     output-print "Density estimates:"
-    foreach n-values nr.species [? + 1] [
-    let sp.param item ? species.data
+    foreach n-values nr.species [[x] -> x + 1] [
+    [let sp.param item ? species.data
     let name item 0 sp.param
     let sp.dens.pair list name precision (occurrences name counted.fishes / sampling.area) 3
     set density.estimates lput sp.dens.pair density.estimates

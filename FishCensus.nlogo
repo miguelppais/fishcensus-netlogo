@@ -413,12 +413,12 @@ end
 to do.outputs
   ask divers [
     output-print "Density estimates:"
-    foreach n-values nr.species [? + 1] [
-    let sp.param item ? species.data
-    let name item 0 sp.param
-    let sp.dens.pair list name precision (occurrences name counted.fishes / sampling.area) 3
-    set density.estimates lput sp.dens.pair density.estimates
-    output-print (word first sp.dens.pair ": " last sp.dens.pair)
+    foreach n-values nr.species [[x] -> x + 1] [
+      [n] -> let sp.param item n species.data
+      let name item 0 sp.param
+      let sp.dens.pair list name precision (occurrences name counted.fishes / sampling.area) 3
+      set density.estimates lput sp.dens.pair density.estimates
+      output-print (word first sp.dens.pair ": " last sp.dens.pair)
     ]
     output-print "Bias due to non-instantaneous sampling:"
     foreach n-values nr.species [? + 1] [
