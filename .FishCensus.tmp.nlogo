@@ -115,8 +115,8 @@ to setup
   if length item 0 species.data != 82 [user-message "ERROR: unable to separate parameters in the file. Ensure the correct file delimiter was picked." stop] ; ERROR MESSAGE
   set nr.species length species.data - 1                                                            ; all filled lines minus the header
   set real.densities []                                                                             ; establishes real.densities as a list
-  foreach n-values nr.species [[x] -> x + 1] [                                                      ; Fills real densities with data from file   UPDATED TO NEW CODE SYNTAX FOR NETLOGO 6.0
-    [n] -> let sp.param item n species.data
+  foreach n-values nr.species [[x] -> x + 1] [                                                      ; Fills real densities with data from file
+    [n] -> let sp.param item  species.data
   let real.dens.pair list item 0 sp.param item 4 sp.param
   set real.densities lput real.dens.pair real.densities
     ]
