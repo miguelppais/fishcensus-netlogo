@@ -721,13 +721,13 @@ to-report scale [ scalar vector ]
 end
 
 to-report magnitude [ vector ]
-  report sqrt sum map [ [v] -> v * v ] vector
+  report sqrt sum map [ [v] -> v *  ] vector
 end
 
 to-report normalize [ vector ]
   let m magnitude vector
   if m = 0 [ report vector ]
-  report map [ [v] -> v / m ] vector
+  report map [ ? / m ] vector
 end
 
 ;DIVER PROCEDURES
