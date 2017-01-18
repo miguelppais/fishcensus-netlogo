@@ -1,22 +1,10 @@
-extensions [
- csv
-]
+extensions [csv vid]
 
 breed [ fishes fish ]
 breed [ predators predator ]
 breed [ divers diver ]
 
-globals [
-sp.param
-b1.sp.param
-b2.sp.param
-b3.sp.param
-b4.sp.param
-loaded.behavior
-wat.dens.value
-schoolmate-counts
-recording ; start or stop video recording
-]
+globals [sp.param b1.sp.param b2.sp.param b3.sp.param b4.sp.param loaded.behavior wat.dens.value schoolmate-counts recording _recording-save-file-name]
 
 predators-own [
  satiety             ; when >0, the predator does not seek prey. Decreases from 100 with time.
@@ -109,7 +97,7 @@ to go
     ]
   ask divers [fd 8 / (60 * movement.time.step)]
   if smooth.animation?  [display]
-  if recording [movie-grab-view]
+  if recording [vid:record-view]
   ]
   ask predators [if satiety > 0 [set satiety satiety - 5]]
   tick
@@ -242,7 +230,7 @@ to add-urge [urge factor] ;; fish procedure
 end
 
 
-to-report patch-center-urge  ;; fish reporter
+to-report patch-center-urge  ; a vector directed at the center of the picked patch
   ifelse picked.patch != false [
     let patch-x [pxcor] of picked.patch
     let patch-y [pycor] of picked.patch
@@ -253,51 +241,43 @@ to-report patch-center-urge  ;; fish reporter
 end
 
 
-to-report center-urge ;; fish reporter
-  ;; report the average distance from my schoolmates
-  ;; in each direction
+to-report center-urge  ; a vector directed at the average location of my schoolmates
+
   if count schoolmates = 0 or center.w = 0
   [ report (list 0 0) ]
   report
-    (map
-      [ ?2 - ?1 ]
+    (map -
+      (list mean [ xcor ] of schoolmates mean [ ycor ] of schoolmates)
       (list xcor ycor)
-      (list
-        mean [ xcor ] of schoolmates
-        mean [ ycor ] of schoolmates ) )
+  )
 end
 
-to-report align-urge ; fish reporter
-  ;; report the average difference in velocity
-  ;; from my school mates
+to-report align-urge ; a vector obtained by averaging the velocity of schoolmates
   if count schoolmates = 0 or align.w = 0
   [ report (list 0 0) ]
-  report normalize (
-    ( map
-      [ ?1 - ?2 ]
-      (list
-        mean [ first velocity ] of schoolmates   ; x component
-        mean [ last velocity ] of schoolmates )  ; y component
-      velocity ))
+  report
+    (map - (list
+      mean [ first velocity ] of schoolmates   ; x component
+     mean [ last velocity ] of schoolmates     ; y component
+     )
+  velocity
+  )
 end
 
-to-report rest-urge ; fish reporter
-  ;; report the difference in velocity
-  ;; from [0 0]
+to-report rest-urge ;a vector opposite to current velocity (counters current movement)
   report subtract [0 0] velocity
 end
 
-to-report cruise-urge ; fish reporter
-  ; normalize the current velocity vector
+
+to-report cruise-urge ; a vector that simply reinforces the current velocity
   report normalize velocity
 end
 
-to-report wander-urge ; fish reporter
-  ;; report 2 random numbers between -1 and 1
+to-report wander-urge ; reports 2 random numbers between -1 and 1, leading to a vector with random direction
   report n-values 2 [ (random-float 2) - 1 ]
 end
 
-to-report spacing-urge ; fish reporter
+to-report spacing-urge
   let urge [ 0 0 ]
   ;; report the sum of the distances to fishes
   ;; in my school that are closer to me than
@@ -313,8 +293,7 @@ to-report spacing-urge ; fish reporter
   report urge
 end
 
-to-report avoid-predator-urge ;; fish reporter
-; a normalized vector that is opposite to the position of the closest predator
+to-report avoid-predator-urge ; a normalized vector that is opposite to the position of the closest predator
  let urge (list 0 0)
   if predator.avoidance.w = 0 [ report urge ]
   let threats predators in-cone approach.dist perception.angle
@@ -324,8 +303,7 @@ to-report avoid-predator-urge ;; fish reporter
   report urge
 end
 
-to-report avoid-diver-urge ; fish reporter
-; a normalized vector that is opposite to the position of the closest diver
+to-report avoid-diver-urge ; a normalized vector that is opposite to the position of the closest diver
  let urge (list 0 0)
   if diver.avoidance.w = 0 [ report urge ]
   let human_threats divers in-cone approach.dist perception.angle
@@ -344,32 +322,32 @@ to-report random-bernoulli [probability-true]
 end
 
 to-report random-float-between [a b]
-  report random-float (b - a + 1) + a
+  report random-float a + (b - a)
 end
 
 
 ; vector operations
 
 to-report add [ v1 v2 ]
-  report (map [ ?1 + ?2 ] v1 v2)
+  report (map + v1 v2)
 end
 
 to-report subtract [ v1 v2 ]
-  report (map [ ?1 - ?2 ] v1 v2)
+  report (map - v1 v2)
 end
 
 to-report scale [ scalar vector ]
-  report map [ scalar * ? ] vector
+  report map [ [v] -> scalar * v ] vector
 end
 
 to-report magnitude [ vector ]
-  report sqrt sum map [ ? * ? ] vector
+  report sqrt sum map [ [v] -> v * v ] vector
 end
 
 to-report normalize [ vector ]
   let m magnitude vector
   if m = 0 [ report vector ]
-  report map [ ? / m ] vector
+  report map [ [v] -> v / m ] vector
 end
 
 
@@ -687,8 +665,8 @@ end
 GRAPHICS-WINDOW
 530
 10
-1140
-941
+1138
+919
 -1
 -1
 30.0
@@ -780,7 +758,7 @@ schoolmate.dist
 schoolmate.dist
 0.1
 10
-1
+1.0
 0.1
 1
 body lenghts
@@ -795,7 +773,7 @@ spacing.w
 spacing.w
 0
 50
-20
+20.0
 1
 1
 NIL
@@ -810,7 +788,7 @@ center.w
 center.w
 0
 20
-5
+5.0
 1
 1
 NIL
@@ -825,7 +803,7 @@ align.w
 align.w
 0
 20
-10
+10.0
 1
 1
 NIL
@@ -840,7 +818,7 @@ wander.w
 wander.w
 0
 10
-8
+8.0
 1
 1
 NIL
@@ -889,7 +867,7 @@ picked.patch.dist
 picked.patch.dist
 0
 10
-1
+1.0
 0.5
 1
 meters
@@ -904,7 +882,7 @@ predator.avoidance.w
 predator.avoidance.w
 -5
 100
-100
+100.0
 1
 1
 NIL
@@ -930,7 +908,7 @@ perception.angle
 perception.angle
 45
 360
-320
+320.0
 5
 1
 degrees
@@ -945,7 +923,7 @@ diver.avoidance.w
 diver.avoidance.w
 -5
 100
-10
+10.0
 1
 1
 NIL
@@ -960,7 +938,7 @@ patch.gathering.w
 patch.gathering.w
 0
 20
-0
+0.0
 1
 1
 NIL
@@ -1248,16 +1226,6 @@ fish.size
 meters
 HORIZONTAL
 
-CHOOSER
-260
-180
-445
-225
-fish.color
-fish.color
-8 9.9 18 28 38 48 58 68 88 128 138
-1
-
 BUTTON
 20
 1095
@@ -1301,7 +1269,7 @@ id.distance
 id.distance
 0.5
 20
-5
+5.0
 0.5
 1
 meters
@@ -1327,7 +1295,7 @@ b1.freq
 b1.freq
 0
 1
-0
+0.0
 0.05
 1
 NIL
@@ -1342,7 +1310,7 @@ b2.freq
 b2.freq
 0
 1
-0
+0.0
 0.05
 1
 NIL
@@ -1357,7 +1325,7 @@ b3.freq
 b3.freq
 0
 1
-0
+0.0
 0.05
 1
 NIL
@@ -1372,7 +1340,7 @@ b4.freq
 b4.freq
 0
 1
-0
+0.0
 0.05
 1
 NIL
@@ -1391,9 +1359,9 @@ b1.freq + b2.freq + b3.freq + b4.freq
 
 CHOOSER
 260
-230
+245
 525
-275
+290
 prey.type
 prey.type
 "benthic" "fish"
@@ -1408,7 +1376,7 @@ detectability
 detectability
 0
 1
-1
+1.0
 0.1
 1
 NIL
@@ -1444,7 +1412,7 @@ prey.chasing.w
 prey.chasing.w
 0
 50
-0
+0.0
 1
 1
 NIL
@@ -1533,7 +1501,7 @@ predator.max.turn
 predator.max.turn
 5
 90
-20
+20.0
 1
 1
 degrees
@@ -1563,7 +1531,7 @@ predator.vision.angle
 predator.vision.angle
 90
 360
-270
+270.0
 1
 1
 degrees
@@ -1578,7 +1546,7 @@ predator.vision.distance
 predator.vision.distance
 0.1
 5
-2
+2.0
 0.1
 1
 meters
@@ -1593,7 +1561,7 @@ rest.w
 rest.w
 0
 20
-0
+0.0
 1
 1
 NIL
@@ -1700,9 +1668,9 @@ max.sustained.speed / fish.size
 
 BUTTON
 335
-280
+295
 525
-316
+331
 Estimate speeds
 estimate-speeds
 NIL
@@ -1717,19 +1685,19 @@ NIL
 
 INPUTBOX
 260
-280
+295
 335
-340
+355
 aspect.ratio
-3
+3.0
 1
 0
 Number
 
 TEXTBOX
-345
-320
-525
+340
+330
+520
 355
 from caudal fin aspect ratio and body length.
 11
@@ -1886,7 +1854,7 @@ cruise.w
 cruise.w
 0
 10
-0
+0.0
 1
 1
 NIL
@@ -2037,7 +2005,7 @@ BUTTON
 445
 180
 525
-225
+240
 paint fishes
 ask fishes [set color fish.color]
 NIL
@@ -2120,7 +2088,7 @@ school.size.reference.radius
 school.size.reference.radius
 0.1
 5
-1
+1.0
 0.1
 1
 m
@@ -2132,7 +2100,7 @@ BUTTON
 515
 790
 STOP
-set recording FALSE\nmovie-close\n
+set recording FALSE\nvid:save-recording _recording-save-file-name\nuser-message (word \"Done! Video file \" _recording-save-file-name \".mp4 can be found on the model folder.\")
 NIL
 1
 T
@@ -2149,7 +2117,7 @@ BUTTON
 460
 790
 REC
-let movie.name user-input \"Pick a name for the movie file (exclude extension).\"\nmovie-start word movie.name \".mov\"\nmovie-set-frame-rate movement.time.step\nuser-message (word \"File \" movie.name \".mov created. Press OK to start recording!\")\nset recording true
+set _recording-save-file-name user-input \"Pick a name for the movie file (exclude extension). Please beware that any file with the same name will be overwritten.\"\nvid:start-recorder\nuser-message \"Press OK to start recording, press STOP on the video recorder when done.\"\nset recording true
 NIL
 1
 T
@@ -2243,6 +2211,27 @@ Always save as a behavior after changes in this section!
 11
 15.0
 1
+
+TEXTBOX
+415
+850
+530
+920
+This behavior is used to initialize the census model. Pick the most common or typical.
+11
+15.0
+1
+
+INPUTBOX
+260
+180
+440
+240
+fish.color
+65.0
+1
+0
+Color
 
 @#$#@#$#@
 ##WHAT IS IT##
@@ -2585,9 +2574,8 @@ false
 0
 Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
-
 @#$#@#$#@
-NetLogo 5.3.1
+NetLogo 6.0
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
@@ -2603,7 +2591,6 @@ true
 0
 Line -7500403 true 150 150 90 180
 Line -7500403 true 150 150 210 180
-
 @#$#@#$#@
 1
 @#$#@#$#@
