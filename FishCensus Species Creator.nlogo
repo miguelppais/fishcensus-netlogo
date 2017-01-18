@@ -230,7 +230,7 @@ to add-urge [urge factor] ;; fish procedure
 end
 
 
-to-report patch-center-urge  ;; fish reporter
+to-report patch-center-urge  ; a vector directed at the center of the picked patch
   ifelse picked.patch != false [
     let patch-x [pxcor] of picked.patch
     let patch-y [pycor] of picked.patch
@@ -241,49 +241,43 @@ to-report patch-center-urge  ;; fish reporter
 end
 
 
-to-report center-urge ;; fish reporter
-  ;; report the average distance from my schoolmates
-  ;; in each direction
+to-report center-urge  ; a vector directed at the average location of my schoolmates
+
   if count schoolmates = 0 or center.w = 0
   [ report (list 0 0) ]
   report
-    (map [ [?1 ?2] -> ?2 - ?1 ]
+    (map -
+      (list mean [ xcor ] of schoolmates mean [ ycor ] of schoolmates)
       (list xcor ycor)
-      (list
-        mean [ xcor ] of schoolmates
-        mean [ ycor ] of schoolmates ) )
+  )
 end
 
-to-report align-urge ; fish reporter
-  ;; report the average difference in velocity
-  ;; from my school mates
+to-report align-urge ; a vector obtained by averaging the velocity of schoolmates
   if count schoolmates = 0 or align.w = 0
   [ report (list 0 0) ]
-  report normalize (
-    ( map [ [?1 ?2] -> ?1 - ?2 ]
-      (list
-        mean [ first velocity ] of schoolmates   ; x component
-        mean [ last velocity ] of schoolmates )  ; y component
-      velocity ))
+  report
+    (map - (list
+      mean [ first velocity ] of schoolmates   ; x component
+     mean [ last velocity ] of schoolmates     ; y component
+     )
+  velocity
+  )
 end
 
-to-report rest-urge ; fish reporter
-  ;; report the difference in velocity
-  ;; from [0 0]
+to-report rest-urge ;a vector opposite to current velocity (counters current movement)
   report subtract [0 0] velocity
 end
 
-to-report cruise-urge ; fish reporter
-  ; normalize the current velocity vector
+
+to-report cruise-urge ; a vector that simply reinforces the current velocity
   report normalize velocity
 end
 
-to-report wander-urge ; fish reporter
-  ;; report 2 random numbers between -1 and 1
+to-report wander-urge ; reports 2 random numbers between -1 and 1, leading to a vector with random direction
   report n-values 2 [ (random-float 2) - 1 ]
 end
 
-to-report spacing-urge ; fish reporter
+to-report spacing-urge
   let urge [ 0 0 ]
   ;; report the sum of the distances to fishes
   ;; in my school that are closer to me than
@@ -299,8 +293,7 @@ to-report spacing-urge ; fish reporter
   report urge
 end
 
-to-report avoid-predator-urge ;; fish reporter
-; a normalized vector that is opposite to the position of the closest predator
+to-report avoid-predator-urge ; a normalized vector that is opposite to the position of the closest predator
  let urge (list 0 0)
   if predator.avoidance.w = 0 [ report urge ]
   let threats predators in-cone approach.dist perception.angle
@@ -310,8 +303,7 @@ to-report avoid-predator-urge ;; fish reporter
   report urge
 end
 
-to-report avoid-diver-urge ; fish reporter
-; a normalized vector that is opposite to the position of the closest diver
+to-report avoid-diver-urge ; a normalized vector that is opposite to the position of the closest diver
  let urge (list 0 0)
   if diver.avoidance.w = 0 [ report urge ]
   let human_threats divers in-cone approach.dist perception.angle
@@ -1234,16 +1226,6 @@ fish.size
 meters
 HORIZONTAL
 
-CHOOSER
-260
-180
-445
-225
-fish.color
-fish.color
-8 9.9 18 28 38 48 58 68 88 128 138
-1
-
 BUTTON
 20
 1095
@@ -1377,9 +1359,9 @@ b1.freq + b2.freq + b3.freq + b4.freq
 
 CHOOSER
 260
-230
+245
 525
-275
+290
 prey.type
 prey.type
 "benthic" "fish"
@@ -1686,9 +1668,9 @@ max.sustained.speed / fish.size
 
 BUTTON
 335
-280
+295
 525
-316
+331
 Estimate speeds
 estimate-speeds
 NIL
@@ -1703,9 +1685,9 @@ NIL
 
 INPUTBOX
 260
-280
+295
 335
-340
+355
 aspect.ratio
 3.0
 1
@@ -1713,9 +1695,9 @@ aspect.ratio
 Number
 
 TEXTBOX
-345
-320
-525
+340
+330
+520
 355
 from caudal fin aspect ratio and body length.
 11
@@ -2023,7 +2005,7 @@ BUTTON
 445
 180
 525
-225
+240
 paint fishes
 ask fishes [set color fish.color]
 NIL
@@ -2118,7 +2100,7 @@ BUTTON
 515
 790
 STOP
-set recording FALSE\nvid:save-recording _recording-save-file-name
+set recording FALSE\nvid:save-recording _recording-save-file-name\nuser-message (word \"Done! Video file \" _recording-save-file-name \".mp4 can be found on the model folder.\")
 NIL
 1
 T
@@ -2135,7 +2117,7 @@ BUTTON
 460
 790
 REC
-let movie.name user-input \"Pick a name for the movie file (exclude extension).\"\nset _recording-save-file-name word movie.name \".mov\"\nvid:start-recorder\nuser-message (word \"File \" movie.name \".mov created. Press OK to start recording!\")\nset recording true
+set _recording-save-file-name user-input \"Pick a name for the movie file (exclude extension). Please beware that any file with the same name will be overwritten.\"\nvid:start-recorder\nuser-message \"Press OK to start recording, press STOP on the video recorder when done.\"\nset recording true
 NIL
 1
 T
@@ -2239,6 +2221,17 @@ This behavior is used to initialize the census model. Pick the most common or ty
 11
 15.0
 1
+
+INPUTBOX
+260
+180
+440
+240
+fish.color
+65.0
+1
+0
+Color
 
 @#$#@#$#@
 ##WHAT IS IT##
