@@ -842,7 +842,7 @@ to-report random-bernoulli [probability-true]
 end
 
 to-report random-float-between [a b]           ; generate a random float between two numbers
-  report random-float (b - a + 1) + a
+  report random-float a + (b - a)
 end
 
 to-report occurrences [x the-list]             ; count the number of occurrences of an item in a list (useful for summarizing species lists)

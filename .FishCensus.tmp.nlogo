@@ -842,12 +842,12 @@ to-report random-bernoulli [probability-true]
 end
 
 to-report random-float-between [a b]           ; generate a random float between two numbers
-  report random-float (b - a + 1) + a
+  report random-float (b - a + 1) +
 end
 
 to-report occurrences [x the-list]             ; count the number of occurrences of an item in a list (useful for summarizing species lists)
   report reduce
-    [[ b] -> ifelse-value (b = x) [a + 1] [a]] (fput 0 the-list)
+    [[occurrence-count next-item] -> ifelse-value (next-item = x) [occurrence-count + 1] [occurrence-count]] (fput 0 the-list)
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
