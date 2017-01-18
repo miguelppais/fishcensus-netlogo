@@ -847,7 +847,7 @@ end
 
 to-report occurrences [x the-list]             ; count the number of occurrences of an item in a list (useful for summarizing species lists)
   report reduce
-    [[ l] -> ifelse-value (l = x) [x + 1] [x]] (fput 0 the-list)
+    [[ b] -> ifelse-value (b = x) [a + 1] [a]] (fput 0 the-list)
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
