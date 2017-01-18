@@ -1,22 +1,10 @@
-extensions [
- csv
-]
+extensions [csv vid]
 
 breed [ fishes fish ]
 breed [ predators predator ]
 breed [ divers diver ]
 
-globals [
-sp.param
-b1.sp.param
-b2.sp.param
-b3.sp.param
-b4.sp.param
-loaded.behavior
-wat.dens.value
-schoolmate-counts
-recording ; start or stop video recording
-]
+globals [sp.param b1.sp.param b2.sp.param b3.sp.param b4.sp.param loaded.behavior wat.dens.value schoolmate-counts recording _recording-save-file-name]
 
 predators-own [
  satiety             ; when >0, the predator does not seek prey. Decreases from 100 with time.
@@ -109,7 +97,7 @@ to go
     ]
   ask divers [fd 8 / (60 * movement.time.step)]
   if smooth.animation?  [display]
-  if recording [movie-grab-view]
+  if recording [vid:record-view]
   ]
   ask predators [if satiety > 0 [set satiety satiety - 5]]
   tick
@@ -259,8 +247,7 @@ to-report center-urge ;; fish reporter
   if count schoolmates = 0 or center.w = 0
   [ report (list 0 0) ]
   report
-    (map
-      [ ?2 - ?1 ]
+    (map [ [?1 ?2] -> ?2 - ?1 ]
       (list xcor ycor)
       (list
         mean [ xcor ] of schoolmates
@@ -273,8 +260,7 @@ to-report align-urge ; fish reporter
   if count schoolmates = 0 or align.w = 0
   [ report (list 0 0) ]
   report normalize (
-    ( map
-      [ ?1 - ?2 ]
+    ( map [ [?1 ?2] -> ?1 - ?2 ]
       (list
         mean [ first velocity ] of schoolmates   ; x component
         mean [ last velocity ] of schoolmates )  ; y component
@@ -344,32 +330,32 @@ to-report random-bernoulli [probability-true]
 end
 
 to-report random-float-between [a b]
-  report random-float (b - a + 1) + a
+  report random-float a + (b - a)
 end
 
 
 ; vector operations
 
 to-report add [ v1 v2 ]
-  report (map [ ?1 + ?2 ] v1 v2)
+  report (map + v1 v2)
 end
 
 to-report subtract [ v1 v2 ]
-  report (map [ ?1 - ?2 ] v1 v2)
+  report (map - v1 v2)
 end
 
 to-report scale [ scalar vector ]
-  report map [ scalar * ? ] vector
+  report map [ [v] -> scalar * v ] vector
 end
 
 to-report magnitude [ vector ]
-  report sqrt sum map [ ? * ? ] vector
+  report sqrt sum map [ [v] -> v * v ] vector
 end
 
 to-report normalize [ vector ]
   let m magnitude vector
   if m = 0 [ report vector ]
-  report map [ ? / m ] vector
+  report map [ [v] -> v / m ] vector
 end
 
 
@@ -687,8 +673,8 @@ end
 GRAPHICS-WINDOW
 530
 10
-1140
-941
+1138
+919
 -1
 -1
 30.0
@@ -780,7 +766,7 @@ schoolmate.dist
 schoolmate.dist
 0.1
 10
-1
+1.0
 0.1
 1
 body lenghts
@@ -795,7 +781,7 @@ spacing.w
 spacing.w
 0
 50
-20
+20.0
 1
 1
 NIL
@@ -810,7 +796,7 @@ center.w
 center.w
 0
 20
-5
+5.0
 1
 1
 NIL
@@ -825,7 +811,7 @@ align.w
 align.w
 0
 20
-10
+10.0
 1
 1
 NIL
@@ -840,7 +826,7 @@ wander.w
 wander.w
 0
 10
-8
+8.0
 1
 1
 NIL
@@ -889,7 +875,7 @@ picked.patch.dist
 picked.patch.dist
 0
 10
-1
+1.0
 0.5
 1
 meters
@@ -904,7 +890,7 @@ predator.avoidance.w
 predator.avoidance.w
 -5
 100
-100
+100.0
 1
 1
 NIL
@@ -930,7 +916,7 @@ perception.angle
 perception.angle
 45
 360
-320
+320.0
 5
 1
 degrees
@@ -945,7 +931,7 @@ diver.avoidance.w
 diver.avoidance.w
 -5
 100
-10
+10.0
 1
 1
 NIL
@@ -960,7 +946,7 @@ patch.gathering.w
 patch.gathering.w
 0
 20
-0
+0.0
 1
 1
 NIL
@@ -1301,7 +1287,7 @@ id.distance
 id.distance
 0.5
 20
-5
+5.0
 0.5
 1
 meters
@@ -1327,7 +1313,7 @@ b1.freq
 b1.freq
 0
 1
-0
+0.0
 0.05
 1
 NIL
@@ -1342,7 +1328,7 @@ b2.freq
 b2.freq
 0
 1
-0
+0.0
 0.05
 1
 NIL
@@ -1357,7 +1343,7 @@ b3.freq
 b3.freq
 0
 1
-0
+0.0
 0.05
 1
 NIL
@@ -1372,7 +1358,7 @@ b4.freq
 b4.freq
 0
 1
-0
+0.0
 0.05
 1
 NIL
@@ -1408,7 +1394,7 @@ detectability
 detectability
 0
 1
-1
+1.0
 0.1
 1
 NIL
@@ -1444,7 +1430,7 @@ prey.chasing.w
 prey.chasing.w
 0
 50
-0
+0.0
 1
 1
 NIL
@@ -1533,7 +1519,7 @@ predator.max.turn
 predator.max.turn
 5
 90
-20
+20.0
 1
 1
 degrees
@@ -1563,7 +1549,7 @@ predator.vision.angle
 predator.vision.angle
 90
 360
-270
+270.0
 1
 1
 degrees
@@ -1578,7 +1564,7 @@ predator.vision.distance
 predator.vision.distance
 0.1
 5
-2
+2.0
 0.1
 1
 meters
@@ -1593,7 +1579,7 @@ rest.w
 rest.w
 0
 20
-0
+0.0
 1
 1
 NIL
@@ -1721,7 +1707,7 @@ INPUTBOX
 335
 340
 aspect.ratio
-3
+3.0
 1
 0
 Number
@@ -1886,7 +1872,7 @@ cruise.w
 cruise.w
 0
 10
-0
+0.0
 1
 1
 NIL
@@ -2120,7 +2106,7 @@ school.size.reference.radius
 school.size.reference.radius
 0.1
 5
-1
+1.0
 0.1
 1
 m
@@ -2132,7 +2118,7 @@ BUTTON
 515
 790
 STOP
-set recording FALSE\nmovie-close\n
+set recording FALSE\nvid:save-recording _recording-save-file-name
 NIL
 1
 T
@@ -2149,7 +2135,7 @@ BUTTON
 460
 790
 REC
-let movie.name user-input \"Pick a name for the movie file (exclude extension).\"\nmovie-start word movie.name \".mov\"\nmovie-set-frame-rate movement.time.step\nuser-message (word \"File \" movie.name \".mov created. Press OK to start recording!\")\nset recording true
+let movie.name user-input \"Pick a name for the movie file (exclude extension).\"\nset _recording-save-file-name word movie.name \".mov\"\nvid:start-recorder\nuser-message (word \"File \" movie.name \".mov created. Press OK to start recording!\")\nset recording true
 NIL
 1
 T
@@ -2595,9 +2581,8 @@ false
 0
 Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
-
 @#$#@#$#@
-NetLogo 5.3.1
+NetLogo 6.0
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
@@ -2613,7 +2598,6 @@ true
 0
 Line -7500403 true 150 150 90 180
 Line -7500403 true 150 150 210 180
-
 @#$#@#$#@
 1
 @#$#@#$#@

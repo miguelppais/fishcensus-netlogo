@@ -1187,7 +1187,7 @@ transect.distance
 transect.distance
 5
 100
-30.0
+15.0
 5
 1
 meters
@@ -1242,7 +1242,7 @@ distance.transect.diver.speed
 distance.transect.diver.speed
 1
 10
-8.0
+10.0
 1
 1
 m/min
