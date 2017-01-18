@@ -830,7 +830,7 @@ end
 to forget.fishes                                                        ; runs if super memory is off
   let seen.fish.id [who] of fishes in-cone max.visibility viewangle
   let diver.memory memory
-  set memory filter [member? ? seen.fish.id] diver.memory
+  set memory filter [[id] -> member? id seen.fish.id] diver.memory
 end
 
 

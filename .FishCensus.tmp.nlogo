@@ -721,13 +721,13 @@ to-report scale [ scalar vector ]
 end
 
 to-report magnitude [ vector ]
-  report sqrt sum map [ [v] -> v *  ] vector
+  report sqrt sum map [ [v] -> v * v ] vector
 end
 
 to-report normalize [ vector ]
   let m magnitude vector
   if m = 0 [ report vector ]
-  report map [ ? / m ] vector
+  report map [ [v] -> v / m ] vector
 end
 
 ;DIVER PROCEDURES
@@ -830,7 +830,7 @@ end
 to forget.fishes                                                        ; runs if super memory is off
   let seen.fish.id [who] of fishes in-cone max.visibility viewangle
   let diver.memory memory
-  set memory filter [member? ? seen.fish.id] diver.memory
+  set memory filter [[id] -> member? id seen.fish.id] diver.memory
 end
 
 
@@ -847,7 +847,7 @@ end
 
 to-report occurrences [x the-list]             ; count the number of occurrences of an item in a list (useful for summarizing species lists)
   report reduce
-    [ifelse-value (?2 = x) [?1 + 1] [?1]] (fput 0 the-list)
+    [[ l] -> ifelse-value (l = x) [x + 1] [x]] (fput 0 the-list)
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
