@@ -115,10 +115,10 @@ to setup
   if length item 0 species.data != 82 [user-message "ERROR: unable to separate parameters in the file. Ensure the correct file delimiter was picked." stop] ; ERROR MESSAGE
   set nr.species length species.data - 1                                                            ; all filled lines minus the header
   set real.densities []                                                                             ; establishes real.densities as a list
-  foreach n-values nr.species [? + 1] [                                                             ; Fills real densities with data from file
-    let sp.param item ? species.data
-    let real.dens.pair list item 0 sp.param item 4 sp.param
-    set real.densities lput real.dens.pair real.densities
+  foreach n-values nr.species [[x] -> x + 1] [                                                      ; Fills real densities with data from file   UPDATED TO NEW CODE SYNTAX FOR NETLOGO 6.0
+    [n] -> let sp.param item n species.data
+  let real.dens.pair list item 0 sp.param item 4 sp.param
+  set real.densities lput real.dens.pair real.densities
     ]
   if fixed.seed? [random-seed seed]
   output-print "Painting floor tiles..."
@@ -164,8 +164,8 @@ to setup
 ; read the information stored in species.data to place fishes
 
   output-print "Placing fishes..."
-  foreach n-values nr.species [? + 1] [           ; loop that creates fish for each species and sets all fish variables
-    let sp.param item ? species.data
+  foreach n-values nr.species [[x] -> x + 1] [           ; loop that creates fish for each species and sets all fish variables
+    [n] -> let sp.param item n species.data
     ifelse override.density = 0 [set total.density item 4 sp.param]
     [set total.density override.density]
     create-fishes (total.density * world.area) [
@@ -175,7 +175,7 @@ to setup
       set picked.patch false
       set schoolmates no-turtles                  ; sets schoolmates as an empty agentset
       set species item 0 sp.param
-      if length sp.param != 82 [user-message (word "ERROR: species number " ? " '" species "' has a parameter list that is incomplete or too long. Check file.") stop] ; ERROR MESSAGE
+      if length sp.param != 82 [user-message (word "ERROR: species number " n " '" species "' has a parameter list that is incomplete or too long. Check file.") stop] ; ERROR MESSAGE
       set shape item 1 sp.param
       set size item 2 sp.param
       ifelse item 17 sp.param = "Seawater - 1027 Kg/m3" [set wat.dens.value 1027] [set wat.dens.value 1000]
@@ -332,54 +332,54 @@ to go
     do.outputs
     stop]
   if sampling.method = "Stationary point count" and stationary.radius > max.visibility [
-   user-message "ERROR: stationary.radius is greater than max.visibility. Diver will not be able to see the sample area."              ; if the stationary radius is higher than visibility, stop and output an error description«
-   stop
+    user-message "ERROR: stationary.radius is greater than max.visibility. Diver will not be able to see the sample area."              ; if the stationary radius is higher than visibility, stop and output an error description«
+    stop
   ]
 
 
   if sampling.method = "Fixed distance transect" [ask divers [                              ; divers count the fishes and then check if finishing conditions are met
-      d.count.fishes
-      set finished? ycor > final.ycor
-      ]
+    d.count.fishes
+    set finished? ycor > final.ycor
+  ]
   ]
   if sampling.method = "Fixed time transect" [ask divers [
-      t.count.fishes
-      set finished? ticks > transect.time.secs
-      ]
+    t.count.fishes
+    set finished? ticks > transect.time.secs
+  ]
   ]
   if sampling.method = "Stationary point count" [ask divers [
-      s.count.fishes
-      set finished? ticks > stationary.time.secs
-      ]
+    s.count.fishes
+    set finished? ticks > stationary.time.secs
+  ]
   ]
   if sampling.method = "Random path" [ask divers [
-      r.count.fishes
-      set finished? ticks > roving.time.secs
-      ]
+    r.count.fishes
+    set finished? ticks > roving.time.secs
+  ]
   ]
 
 
 
   repeat movement.time.step [
 
-  if sampling.method = "Fixed distance transect" [ask divers [do.ddiver.movement]]         ; move the diver
-  if sampling.method = "Fixed time transect" [ask divers [do.tdiver.movement]]
-  if sampling.method = "Stationary point count" [ask divers [do.stdiver.movement]]
-  if sampling.method = "Random path" [ask divers [do.rdiver.movement]]
+    if sampling.method = "Fixed distance transect" [ask divers [do.ddiver.movement]]         ; move the diver
+    if sampling.method = "Fixed time transect" [ask divers [do.tdiver.movement]]
+    if sampling.method = "Stationary point count" [ask divers [do.stdiver.movement]]
+    if sampling.method = "Random path" [ask divers [do.rdiver.movement]]
 
 
-  ask buddies [                                                                           ; move the buddy
-   move-to one-of divers
-   set heading [heading] of one-of divers
-   rt 135 fd sqrt 2                           ; keep 1m behind and 1m to the right of the diver
-   set heading [heading] of one-of divers
+    ask buddies [                                                                           ; move the buddy
+      move-to one-of divers
+      set heading [heading] of one-of divers
+      rt 135 fd sqrt 2                           ; keep 1m behind and 1m to the right of the diver
+      set heading [heading] of one-of divers
 
-  ]
-
-  ask fishes [                                                                            ; move the fishes
-    do.fish.movement
     ]
-  if smooth.animation? [display]
+
+    ask fishes [                                                                            ; move the fishes
+      do.fish.movement
+    ]
+    if smooth.animation? [display]
   ] ; closes repeat movement.time.step
 
   if sampling.method = "Random path" and ticks mod 2 = 0 [
@@ -393,7 +393,7 @@ to go
     ask fishes [
       set behavior.set? false
       set.behavior
-      ]                                      ; fishes set a new behavior in the end of the go procedure, every x seconds (determined by behavior.change.interval)
+    ]                                      ; fishes set a new behavior in the end of the go procedure, every x seconds (determined by behavior.change.interval)
   ]
   advance-clock
   tick
@@ -413,35 +413,35 @@ end
 to do.outputs
   ask divers [
     output-print "Density estimates:"
-    foreach n-values nr.species [? + 1] [
-    let sp.param item ? species.data
-    let name item 0 sp.param
-    let sp.dens.pair list name precision (occurrences name counted.fishes / sampling.area) 3
-    set density.estimates lput sp.dens.pair density.estimates
-    output-print (word first sp.dens.pair ": " last sp.dens.pair)
+    foreach n-values nr.species [[x] -> x + 1] [
+      [n] -> let sp.param item n species.data
+      let name item 0 sp.param
+      let sp.dens.pair list name precision (occurrences name counted.fishes / sampling.area) 3
+      set density.estimates lput sp.dens.pair density.estimates
+      output-print (word first sp.dens.pair ": " last sp.dens.pair)
     ]
     output-print "Bias due to non-instantaneous sampling:"
-    foreach n-values nr.species [? + 1] [
-    let sp.param item ? species.data
-    let name item 0 sp.param
-    let snapshot.dens.pair list name precision (occurrences name snapshot.fishes / sampling.area) 3
-    set snapshot.estimates lput snapshot.dens.pair snapshot.estimates ; this just stores snapshot densities in a variable
-    ifelse last snapshot.dens.pair = 0 [
-      let bias.pair list name "n/a"       ; if snapshot.density is 0, do not calculate bias due to non-instantaneous sampling
-      set bias.estimates lput bias.pair bias.estimates ; this just stores bias estimates in a variable
-      output-print (word first bias.pair ": " last bias.pair)
+    foreach n-values nr.species [[x] -> x + 1] [
+      [n] -> let sp.param item n species.data
+      let name item 0 sp.param
+      let snapshot.dens.pair list name precision (occurrences name snapshot.fishes / sampling.area) 3
+      set snapshot.estimates lput snapshot.dens.pair snapshot.estimates ; this just stores snapshot densities in a variable
+      ifelse last snapshot.dens.pair = 0 [
+        let bias.pair list name "n/a"       ; if snapshot.density is 0, do not calculate bias due to non-instantaneous sampling
+        set bias.estimates lput bias.pair bias.estimates ; this just stores bias estimates in a variable
+        output-print (word first bias.pair ": " last bias.pair)
       ] [
-      let bias.pair list name precision ((((last item (? - 1) density.estimates)) - (last snapshot.dens.pair)) / (last snapshot.dens.pair)) 3 ; bias is calculated as (counted density - snapshot density) / snapshot density
-      set bias.estimates lput bias.pair bias.estimates ; this just stores bias estimates in a variable
-      output-print (word first bias.pair ": " last bias.pair)
+        let bias.pair list name precision ((((last item (n - 1) density.estimates)) - (last snapshot.dens.pair)) / (last snapshot.dens.pair)) 3 ; bias is calculated as (counted density - snapshot density) / snapshot density
+        set bias.estimates lput bias.pair bias.estimates ; this just stores bias estimates in a variable
+        output-print (word first bias.pair ": " last bias.pair)
       ]
-      ]
-   set output.real total.density                             ; fill output variables for BehaviourSpace (if more than 1 species, these outputs only apply to the 1st)
-   set output.estimated last first density.estimates
-   set output.difference output.estimated - output.real
-   set output.inaccuracy output.difference / output.real
-   set output.instantaneous last first snapshot.estimates
-   set output.bias last first bias.estimates
+    ]
+    set output.real total.density                             ; fill output variables for BehaviourSpace (if more than 1 species, these outputs only apply to the 1st)
+    set output.estimated last first density.estimates
+    set output.difference output.estimated - output.real
+    set output.inaccuracy output.difference / output.real
+    set output.instantaneous last first snapshot.estimates
+    set output.bias last first bias.estimates
   ]
 end ; of do.outputs
 
@@ -541,10 +541,10 @@ end
 
 to set.behavior                                                        ; fish procedure
   if not behavior.set? [
-    let pairs (map list behavior.list behavior.freqs)                    ; pairs behavior names with probabilities as lists within a list, to work better with the rnd extension: [[b1 0.2] [b2 0.3] [b3 0.5]]
-    set current.behavior first rnd:weighted-one-of pairs [ last ? ]      ; pick a random behavior from behavior list, using a weighted random pick
-    let param.pos position current.behavior behavior.list                ; check which behavior was picked (1, 2, 3 or 4)
-    let params item param.pos behavior.params                            ; retreive list of parameters from the correct position in behavior.params
+    let pairs (map list behavior.list behavior.freqs)                          ; pairs behavior names with probabilities as lists within a list, to work better with the rnd extension: [[b1 0.2] [b2 0.3] [b3 0.5]]
+    set current.behavior first rnd:weighted-one-of-list pairs [[p] -> last p]  ; pick a random behavior from behavior list, using a weighted random pick
+    let param.pos position current.behavior behavior.list                      ; check which behavior was picked (1, 2, 3 or 4)
+    let params item param.pos behavior.params                                  ; retreive list of parameters from the correct position in behavior.params
     set detectability item 2 params
     set schooling? item 3 params
     set schoolmate.dist item 4 params
@@ -624,7 +624,7 @@ end
 
 ; fish urges
 
-to-report patch-center-urge  ;; fish reporter
+to-report patch-center-urge  ; a vector directed at the center of the picked patch
   ifelse picked.patch != false [
     let patch-x [pxcor] of picked.patch
     let patch-y [pycor] of picked.patch
@@ -635,51 +635,42 @@ to-report patch-center-urge  ;; fish reporter
 end
 
 
-to-report center-urge ;; fish reporter
-  ;; report the average distance from my schoolmates
-  ;; in each direction
+to-report center-urge  ; a vector directed at the average location of my schoolmates
+
   if count schoolmates = 0 or center.w = 0
   [ report (list 0 0) ]
   report
-    (map
-      [ ?2 - ?1 ]
+    (map -
+      (list mean [ xcor ] of schoolmates mean [ ycor ] of schoolmates)
       (list xcor ycor)
-      (list
-        mean [ xcor ] of schoolmates
-        mean [ ycor ] of schoolmates ) )
+  )
 end
 
-to-report align-urge ;; fish reporter
-  ;; report the average difference in velocity
-  ;; from my school mates
+to-report align-urge ; a vector obtained by averaging the velocity of schoolmates
   if count schoolmates = 0 or align.w = 0
   [ report (list 0 0) ]
   report
-    ( map
-      [ ?1 - ?2 ]
-      (list
-        mean [ first velocity ] of schoolmates   ; x component
-        mean [ last velocity ] of schoolmates )  ; y component
-      velocity )
+    (map - (list
+      mean [ first velocity ] of schoolmates   ; x component
+     mean [ last velocity ] of schoolmates     ; y component
+     )
+  velocity
+  )
 end
 
-to-report rest-urge ;; fish reporter
-  ;; report the difference in velocity
-  ;; from [0 0]
+to-report rest-urge ;a vector opposite to current velocity (counters current movement)
   report subtract [0 0] velocity
 end
 
-to-report cruise-urge ; fish reporter
-  ; normalize the current velocity vector
+to-report cruise-urge ; a vector that simply reinforces the current velocity
   report normalize velocity
 end
 
-to-report wander-urge ; fish reporter
-  ;; report 2 random numbers between -1 and 1
+to-report wander-urge ; reports 2 random numbers between -1 and 1, leading to a vector with random direction
   report n-values 2 [ (random-float 2) - 1 ]
 end
 
-to-report spacing-urge ;; fish reporter
+to-report spacing-urge
   let urge [ 0 0 ]
   ;; report the sum of the distances to fishes
   ;; in my school that are closer to me than
@@ -695,8 +686,7 @@ to-report spacing-urge ;; fish reporter
   report urge
 end
 
-to-report avoid-predator-urge ;; fish reporter
-; a normalized vector that is opposite to the position of the closest predator
+to-report avoid-predator-urge ; a normalized vector that is opposite to the position of the closest predator
  let urge (list 0 0)
   if predator.avoidance.w = 0 [ report urge ]
   let predators fishes in-cone approach.dist perception.angle with [species != [species] of myself and prey.type = "fish"]
@@ -706,8 +696,7 @@ to-report avoid-predator-urge ;; fish reporter
   report urge
 end
 
-to-report avoid-diver-urge ;; fish reporter
-; a normalized vector that is opposite to the position of the closest person
+to-report avoid-diver-urge ; a normalized vector that is opposite to the position of the closest person
  let urge (list 0 0)
   if diver.avoidance.w = 0 [ report urge ]
   let threats persons in-cone approach.dist perception.angle                        ; persons is an agenteset that includes divers and buddies
@@ -720,25 +709,25 @@ end
 ;VECTOR OPERATIONS
 
 to-report add [ v1 v2 ]
-  report (map [ ?1 + ?2 ] v1 v2)
+  report (map + v1 v2)
 end
 
 to-report subtract [ v1 v2 ]
-  report (map [ ?1 - ?2 ] v1 v2)
+  report (map - v1 v2)
 end
 
 to-report scale [ scalar vector ]
-  report map [ scalar * ? ] vector
+  report map [ [v] -> scalar * v ] vector
 end
 
 to-report magnitude [ vector ]
-  report sqrt sum map [ ? * ? ] vector
+  report sqrt sum map [ [v] -> v * v ] vector
 end
 
 to-report normalize [ vector ]
   let m magnitude vector
   if m = 0 [ report vector ]
-  report map [ ? / m ] vector
+  report map [ [v] -> v / m ] vector
 end
 
 ;DIVER PROCEDURES
@@ -841,7 +830,7 @@ end
 to forget.fishes                                                        ; runs if super memory is off
   let seen.fish.id [who] of fishes in-cone max.visibility viewangle
   let diver.memory memory
-  set memory filter [member? ? seen.fish.id] diver.memory
+  set memory filter [[id] -> member? id seen.fish.id] diver.memory
 end
 
 
@@ -853,19 +842,19 @@ to-report random-bernoulli [probability-true]
 end
 
 to-report random-float-between [a b]           ; generate a random float between two numbers
-  report random-float (b - a + 1) + a
+  report random-float a + (b - a)
 end
 
 to-report occurrences [x the-list]             ; count the number of occurrences of an item in a list (useful for summarizing species lists)
   report reduce
-    [ifelse-value (?2 = x) [?1 + 1] [?1]] (fput 0 the-list)
+    [[occurrence-count next-item] -> ifelse-value (next-item = x) [occurrence-count + 1] [occurrence-count]] (fput 0 the-list)
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
 415
 10
-1025
-2441
+1023
+2419
 -1
 -1
 30.0
@@ -959,7 +948,7 @@ timed.transect.diver.speed
 timed.transect.diver.speed
 1
 10
-8
+8.0
 1
 1
 m/min
@@ -994,7 +983,7 @@ stationary.turning.angle
 stationary.turning.angle
 0
 90
-4
+4.0
 1
 1
 º / sec
@@ -1009,7 +998,7 @@ max.visibility
 max.visibility
 2
 40
-7
+8.0
 1
 1
 m
@@ -1024,7 +1013,7 @@ stationary.radius
 stationary.radius
 1
 20
-3
+3.0
 0.5
 1
 m
@@ -1057,7 +1046,7 @@ roving.diver.speed
 roving.diver.speed
 1
 10
-8
+8.0
 1
 1
 m/min
@@ -1082,7 +1071,7 @@ roving.diver.turning.angle
 roving.diver.turning.angle
 0
 45
-20
+20.0
 1
 1
 º / 2 secs
@@ -1183,7 +1172,7 @@ transect.time
 transect.time
 1
 90
-1
+1.0
 1
 1
 minutes
@@ -1198,7 +1187,7 @@ transect.distance
 transect.distance
 5
 100
-30
+20.0
 5
 1
 meters
@@ -1213,7 +1202,7 @@ stationary.time
 stationary.time
 1
 90
-5
+5.0
 1
 1
 minutes
@@ -1228,7 +1217,7 @@ roving.time
 roving.time
 1
 90
-2
+2.0
 1
 1
 minutes
@@ -1253,7 +1242,7 @@ distance.transect.diver.speed
 distance.transect.diver.speed
 1
 10
-8
+8.0
 1
 1
 m/min
@@ -1301,7 +1290,7 @@ behavior.change.interval
 behavior.change.interval
 1
 20
-10
+10.0
 1
 1
 seconds
@@ -1447,7 +1436,7 @@ timed.transect.width
 timed.transect.width
 1
 20
-2
+2.0
 1
 1
 m
@@ -1462,7 +1451,7 @@ distance.transect.width
 distance.transect.width
 1
 20
-2
+2.0
 1
 1
 m
@@ -1535,7 +1524,7 @@ INPUTBOX
 230
 285
 seed
-123456
+123456.0
 1
 0
 Number
@@ -1614,7 +1603,7 @@ INPUTBOX
 310
 70
 override.density
-0
+0.2
 1
 0
 Number
@@ -1638,7 +1627,7 @@ count.saturation
 count.saturation
 1
 10
-3
+3.0
 1
 1
 fish per second
@@ -1694,7 +1683,7 @@ transect.viewangle
 transect.viewangle
 10
 360
-180
+180.0
 10
 1
 degrees
@@ -1709,7 +1698,7 @@ stationary.viewangle
 stationary.viewangle
 10
 360
-160
+160.0
 10
 1
 degrees
@@ -1724,7 +1713,7 @@ rpath.viewangle
 rpath.viewangle
 10
 360
-160
+160.0
 10
 1
 degrees
@@ -1800,7 +1789,7 @@ initial.time.to.stabilize.movement
 initial.time.to.stabilize.movement
 5
 50
-20
+20.0
 5
 1
 seconds
@@ -2224,12 +2213,78 @@ false
 0
 Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
-
 @#$#@#$#@
-NetLogo 5.3.1
-@#$#@#$#@
+NetLogo 6.0
 @#$#@#$#@
 @#$#@#$#@
+@#$#@#$#@
+<experiments>
+  <experiment name="Effect of swim speed in 20x2m transect" repetitions="5" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>output.real</metric>
+    <metric>output.estimated</metric>
+    <metric>output.difference</metric>
+    <metric>output.inaccuracy</metric>
+    <metric>output.instantaneous</metric>
+    <metric>output.bias</metric>
+    <enumeratedValueSet variable="sampling.method">
+      <value value="&quot;Fixed distance transect&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="distance.transect.diver.speed">
+      <value value="6"/>
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="distance.transect.width">
+      <value value="2"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="transect.distance">
+      <value value="20"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="buddy?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="initial.time.to.stabilize.movement">
+      <value value="20"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="max.visibility">
+      <value value="8"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="movement.time.step">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="override.density">
+      <value value="0.2"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="behavior.change.interval">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="super.memory?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="file.name">
+      <value value="&quot;example&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="transect.viewangle">
+      <value value="180"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="smooth.animation?">
+      <value value="true"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="fixed.seed?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="count.saturation">
+      <value value="3"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="file.delimiter">
+      <value value="&quot;,&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="show.diver.detail.window?">
+      <value value="false"/>
+    </enumeratedValueSet>
+  </experiment>
+</experiments>
 @#$#@#$#@
 @#$#@#$#@
 default
@@ -2242,7 +2297,6 @@ true
 0
 Line -7500403 true 150 150 90 180
 Line -7500403 true 150 150 210 180
-
 @#$#@#$#@
 1
 @#$#@#$#@
