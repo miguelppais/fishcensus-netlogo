@@ -322,7 +322,7 @@ to-report random-bernoulli [probability-true]
 end
 
 to-report random-float-between [a b]
-  report random-float a + (b - a)
+  report a + random-float (b - a)
 end
 
 
@@ -1501,7 +1501,7 @@ predator.max.turn
 predator.max.turn
 5
 90
-20.0
+21.0
 1
 1
 degrees
@@ -2002,12 +2002,12 @@ in g and cm2\n
 1
 
 BUTTON
-445
+440
 180
 525
 240
-paint fishes
-ask fishes [set color fish.color]
+redraw fishes
+ask fishes [set color fish.color set size fish.size]
 NIL
 1
 T
@@ -2228,7 +2228,7 @@ INPUTBOX
 440
 240
 fish.color
-65.0
+9.9
 1
 0
 Color

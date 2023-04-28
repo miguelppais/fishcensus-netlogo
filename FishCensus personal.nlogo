@@ -1,4 +1,5 @@
 extensions [
+  profiler
   csv              ; used to import species parameters through a csv file
   rnd              ; used by fishes to calculate next behavior with a weighted random pick
   ]
@@ -842,7 +843,7 @@ to-report random-bernoulli [probability-true]
 end
 
 to-report random-float-between [a b]           ; generate a random float between two numbers
-  report random-float a + (b - a)
+  report a + random-float (b - a)
 end
 
 to-report occurrences [x the-list]             ; count the number of occurrences of an item in a list (useful for summarizing species lists)
@@ -1514,7 +1515,7 @@ SWITCH
 258
 fixed.seed?
 fixed.seed?
-1
+0
 1
 -1000
 
@@ -1794,6 +1795,40 @@ initial.time.to.stabilize.movement
 1
 seconds
 HORIZONTAL
+
+BUTTON
+1075
+660
+1177
+693
+NIL
+profiler:start
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+BUTTON
+1085
+700
+1412
+733
+NIL
+profiler:stop\noutput-print profiler:report\nprofiler:reset
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
 
 @#$#@#$#@
 FishCensus version 2.0 by Miguel Pessanha Pais
@@ -2216,7 +2251,7 @@ false
 Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 @#$#@#$#@
-NetLogo 6.0
+NetLogo 6.0.2
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@

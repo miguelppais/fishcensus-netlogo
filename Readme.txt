@@ -38,7 +38,7 @@ Wilensky, U. (2005).  NetLogo Flocking 3D Alternate model.  http://ccl.northwest
 
 If you use this model, please cite the original publication:
 
-Pais, M.P., Cabral, H.N. 2017. Fish behaviour effects on the accuracy and precision of underwater visual census surveys. A virtual ecologist approach using an individual-based model. Ecological Modelling, in press.
+Pais, M.P., Cabral, H.N. 2017. Fish behaviour effects on the accuracy and precision of underwater visual census surveys. A virtual ecologist approach using an individual-based model. Ecological Modelling 346, 58-69.
 
 To cite the model itself, please visit the [OpenABM page](https://www.openabm.org/model/5305) for citation instructions.
 
@@ -60,6 +60,14 @@ This work is licensed under the Creative Commons Attribution-NonCommercial-Share
 If you want to report bugs, suggest features, share work you did with the model, or even insult me, please send me an email: [mppais@fc.ul.pt](mailto:mppais@fc.ul.pt)
 
 ## Changelog
+
+Version 2.0
+- Code updated to NetLogo 6.0 new syntax. Model no longer compatible with NetLogo 5.3.1.
+- Fixed an error when finding a random float between two numbers. It was only affecting roving diver movement, so no big issue.
+- Species creator fish color picker is now an actual color picker!
+- Video recorder in species creator updated to use the new vid extension. Now saves in mp4 instead of mov.
+- Separate instalation of rnd extension no longer needed.
+- Model now comes with an example experiment in BehaviorSpace.
 
 Version 1.1
 - Added more sliders on the interface to edit the movement initialization time and diver view angles
