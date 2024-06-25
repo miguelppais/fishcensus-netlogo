@@ -365,8 +365,8 @@ to save.species.data
   if b4.freq = 0 [set b4.name "n/a" set b4.sp.param ["n/a" 0 0 false 0 0 0 0 0 0 0 0 0 0 0 0]
     output-print "Behavior 4 saved as an empty slot."]
   let behavior.param (sentence b1.sp.param b2.sp.param b3.sp.param b4.sp.param)
-  let file.name word user-input "Choose name for the csv file. Any file with the same name will be overwritten." ".csv"
-  (csv:to-file file.name (list (list
+  let file.name word user-input "Choose name for the csv file. Any file in the ../data/ folder with the same name will be overwritten without warning!" ".csv"
+  (csv:to-file word "../data/" file.name (list (list
       "Species" "shape" "size" "color" "density" "id.distance" "approach.dist" "perception.dist" "perception.angle" "prey.type"
       "max.acceleration" "max.sustained.speed" "burst.speed" "length-surface" "drag-coefficient" "lw-a" "lw-b" "water-density"
       "B1.name" "B1.frequency" "B1.detectability" "B1.schooling?" "B1.schoolmate.dist" "B1.align.w" "B1.center.w" "B1.spacing.w" "B1.wander.w" "B1.rest.w" "B1.cruise.w" "B1.picked.patch.dist" "B1.patch.gathering.w" "B1.predator.avoidance.w" "B1.prey.chasing.w" "B1.diver.avoidance.w"
@@ -375,13 +375,13 @@ to save.species.data
       "B4.name" "B4.frequency" "B4.detectability" "B4.schooling?" "B4.schoolmate.dist" "B4.align.w" "B4.center.w" "B4.spacing.w" "B4.wander.w" "B4.rest.w" "B4.cruise.w" "B4.picked.patch.dist" "B4.patch.gathering.w" "B4.predator.avoidance.w" "B4.prey.chasing.w" "B4.diver.avoidance.w") sentence sp.param behavior.param) ",")
   output-print "Species data saved."
   file-close-all                                                                 ; prevents csv file from being impossible to delete after closing NetLogo (I think...)
-  user-message (word "File " file.name " was created and can be found in the model folder.")
+  user-message (word "File " file.name " was created and can be found in the ../data/ folder.")
 end
 
 to load.species.data
   output-print "Importing species data..."
   let import.name (word user-input "Name of the .csv file with species parameters? (exclude extension)" ".csv")
-  carefully [let species.data (csv:from-file import.name csv.delimiter)                            ; import csv file into a list of lists
+  carefully [let species.data (csv:from-file word "../data/" import.name csv.delimiter)                            ; import csv file into a list of lists
   let nr.species length species.data - 1                                                            ; all filled lines minus the header
   user-message (word "Detected " nr.species " species in the file. If more than one, only the first will be imported.")
   output-print "Setting species parameter values..."
@@ -409,7 +409,7 @@ to load.species.data
   set b3.sp.param sublist params 50 66
   set b4.sp.param sublist params 66 82
     ]
-  [user-message (word "File " import.name " not found in model folder.") stop]
+  [user-message (word "File " import.name " not found in ../data/ folder.") stop]
   output-print "Loading behavior parameters..."
   setup
   load.b1 load.b2 load.b3 load.b4
@@ -1387,7 +1387,7 @@ TEXTBOX
 420
 520
 438
-BEHAVIOR PARAMETERS______________________________________________________________
+BEHAVIOR PARAMETERS
 11
 0.0
 1
@@ -2575,7 +2575,7 @@ false
 Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 @#$#@#$#@
-NetLogo 6.0
+NetLogo 6.4.0
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
