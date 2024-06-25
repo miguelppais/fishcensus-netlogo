@@ -1,8 +1,8 @@
-FishCensus model version 1.1
+FishCensus model version 2.1
 
 by Miguel Pessanha Pais (mppais@fc.ul.pt)
 
-Programmed in NetLogo 5.3.1
+Programmed in NetLogo 6.4
 
 
 ## Context
@@ -36,11 +36,11 @@ Wilensky, U. (2005).  NetLogo Flocking 3D Alternate model.  http://ccl.northwest
 
 ## Credits and references
 
-If you use this model, please cite the original publication:
+If you use this model, please cite the original publications:
 
 Pais, M.P., Cabral, H.N. 2017. Fish behaviour effects on the accuracy and precision of underwater visual census surveys. A virtual ecologist approach using an individual-based model. Ecological Modelling 346, 58-69.
 
-To cite the model itself, please visit the [OpenABM page](https://www.openabm.org/model/5305) for citation instructions.
+To cite the model itself, please visit the [CoMSES Net page](https://www.comses.net/codebases/5305/) for citation instructions.
 
 
 ## Acknowledgments
@@ -49,7 +49,7 @@ I thank everyone who tested the model and interface and helped find bugs, Christ
 
 ## COPYRIGHT AND LICENSE
 
-Copyright 2016 Miguel Pessanha Pais
+Copyright 2024 Miguel Pessanha Pais
 
 ![CC BY-NC-SA 4.0](http://ccl.northwestern.edu/images/creativecommons/byncsa.png)
 
@@ -60,6 +60,11 @@ This work is licensed under the Creative Commons Attribution-NonCommercial-Share
 If you want to report bugs, suggest features, share work you did with the model, or even insult me, please send me an email: [mppais@fc.ul.pt](mailto:mppais@fc.ul.pt)
 
 ## Changelog
+
+Version 2.1
+- Changed folder structure to match COMSES.Net requirements
+- Code to save and load files now saves and loads from the ../data/ folder
+- Minor UI fixes
 
 Version 2.0
 - Code updated to NetLogo 6.0 new syntax. Model no longer compatible with NetLogo 5.3.1.
